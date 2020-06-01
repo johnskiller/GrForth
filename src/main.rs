@@ -1,29 +1,56 @@
-#[derive(Clone,Copy)]
+use std::rc::Rc;
+
+#[derive(Clone)]
 struct Word {
     name: &'static str,
     func: fn(&mut ForthCore),
     //func: for<'r> fn(&'r ForthCore<i32>),
-    //type: WORD_TYPE = Internal,
+    wtype: WordType,
 }
 
 struct ForthCore {
     stack: Vec<i32>,
-    v: Vec<fn()>,
+    //v: Vec<fn()>,
     words: Vec<Word>,
 }
-
-enum WORD_TYPE {
+#[derive(Clone,Copy)]
+enum WordType {
     Internal,
     Dict,
     Lit,
+    Imed, //immediate
 }
 
 impl ForthCore {
     fn new() -> ForthCore {
+        let words = vec![
+            Word {
+                name: "dup",
+                func: Self::dup,
+                wtype: WordType::Internal,
+            },
+            Word {
+                name: "swap",
+                func: Self::swap,
+                wtype: WordType::Internal,
+            },
+            Word {
+                name: ".",
+                func: Self::disp,
+                wtype: WordType::Internal,
+            },
+            Word {
+                name: "*",
+                func: Self::mul,
+                wtype: WordType::Internal,
+            },
+        ];
+
         ForthCore {
+            
             stack: Vec::<i32>::new(),
-            v: Vec::new(),
-            words: Vec::<Word>::new(),
+            //v: Vec::new(),
+            words: words,
         }
     }
     fn dup(&mut self) {
@@ -47,37 +74,18 @@ impl ForthCore {
             print!("{:?} ", x);
         
     }
+
     fn call(&mut self, name: &str) {
-        for w in &self.words.clone() {
-            if name.eq_ignore_ascii_case(w.name) {
-                (w.func)(self)
-            }
+        let mut word = self.words.iter().rev().filter( |w|  w.name.eq_ignore_ascii_case(name));
+        match word.next() {
+            Some(a) => {(a.func)(self)},
+            None => {println!("[{}] word not found",name)},
         }
-    }
-    fn init(&mut self) {
-        let words = vec![
-            Word {
-                name: "dup",
-                func: Self::dup,
-            },
-            Word {
-                name: "swap",
-                func: Self::swap,
-            },
-            Word {
-                name: ".",
-                func: Self::disp,
-            },
-            Word {
-                name: "*",
-                func: Self::mul,
-            },
-        ];
-        self.words = words;
+
     }
 
     fn run(&mut self, s: &str) {
-        for token in s.split(" ") {
+        for token in s.split(" ").filter(|x| !x.eq_ignore_ascii_case("")) {
             match token.parse::<i32>() {
                 Ok(x) => self.stack.push(x),
                 Err(_) => {
@@ -92,15 +100,6 @@ impl ForthCore {
 fn test() {
     println!("Hello, world!");
     let mut core = ForthCore::new();
-    core.init();
-    // v.push(dup);
-    // v.push(swap);
-    //println!("{:x}",v);
-    /*
-    for p in v.iter(){
-        p();
-    }
-    */
 
     let s = ": 52    dup *  . ; ";
     core.run(s);
