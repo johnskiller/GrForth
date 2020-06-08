@@ -114,7 +114,7 @@ enum WordType {
 }
 
 impl ForthCore {
-    fn add_udw(&mut self, name: &'static str, def: Vec<&str>) {
+    pub fn add_udw(&mut self, name: &'static str, def: Vec<&str>) {
         let mut defines = Vec::<usize>::new();
         for n in def {
             let w = self.find(n).unwrap();
@@ -224,42 +224,10 @@ impl ForthCore {
         }
     }
 
-    fn interpret(&mut self, s: &'static str) {
-        let tokenizer = Tokenizer::new(s);
-        let mut new_word: &'static str = "";
-        let mut w_list = Vec::<&str>::new();
-        for token in tokenizer {
-            match token.parse::<i32>() {
-                Ok(x) => self.stack.push(x),
-                Err(_) => {
-                    //println!("will run:[{}]", token);
-                    match self.state {
-                        CoreState::CompileName => {
-                            println!("{}",token);
-                            self.state = CoreState::CompileBody;
-                            new_word = token;
-                        },
-                        CoreState::Normal => self.call_by_name(token),
-                        CoreState::CompileBody => {
-                            println!("body: {}",token);
-                            if token.eq(";") {
-                                self.state = CoreState::Normal;
-
-                                self.add_udw(new_word,w_list.clone());
-                                //self.add_udw("2dup", w_list.clone());
-                                println!("{} define complete",new_word);
-                            } else {
-                                w_list.push(token);
-                            }
-                        }
-
-                    }
-                    
-                }
-            }
-            //println!("[{}]",token);
-        }
+    pub fn push(&mut self, value: i32) {
+        self.stack.push(value);
     }
+
 }
 struct Tokenizer<'a> {
     tokens: std::str::SplitWhitespace<'a>,
@@ -281,6 +249,42 @@ impl<'a> Iterator for Tokenizer<'a> {
     }
 }
 
+fn interpret(core: &mut ForthCore, s: &'static str) {
+    let tokenizer = Tokenizer::new(s);
+    let mut new_word: &'static str = "";
+    let mut w_list = Vec::<&str>::new();
+    for token in tokenizer {
+        match token.parse::<i32>() {
+            Ok(x) => core.push(x),
+            Err(_) => {
+                //println!("will run:[{}]", token);
+                match core.state {
+                    CoreState::CompileName => {
+                        println!("{}",token);
+                        core.state = CoreState::CompileBody;
+                        new_word = token;
+                    },
+                    CoreState::Normal => core.call_by_name(token),
+                    CoreState::CompileBody => {
+                        println!("body: {}",token);
+                        if token.eq(";") {
+                            core.state = CoreState::Normal;
+
+                            core.add_udw(new_word,w_list.clone());
+                            //self.add_udw("2dup", w_list.clone());
+                            println!("{} define complete",new_word);
+                        } else {
+                            w_list.push(token);
+                        }
+                    }
+
+                }
+                
+            }
+        }
+        //println!("[{}]",token);
+    }
+}
 fn test2() {
     let mut tokenizer = Tokenizer::new(": abc 52 dup * . ;");
     assert_eq!(Some(":"),tokenizer.next());
@@ -296,7 +300,7 @@ fn test() {
     core.init();
     println!("{:?}", core);
     let s = "3 2 * . : 2dup dup dup ; 3 2dup * * .";
-    core.interpret(s);
+    interpret(&mut core,s);
 }
 fn main() {
     test()
