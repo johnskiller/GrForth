@@ -224,9 +224,9 @@ impl ForthCore {
         }
     }
 
-    fn interpret(&mut self, s: &str) {
+    fn interpret(&mut self, s: &'static str) {
         let tokenizer = Tokenizer::new(s);
-        let mut new_word: String = String::from("");
+        let mut new_word: &'static str = "";
         let mut w_list = Vec::<&str>::new();
         for token in tokenizer {
             match token.parse::<i32>() {
@@ -237,7 +237,7 @@ impl ForthCore {
                         CoreState::CompileName => {
                             println!("{}",token);
                             self.state = CoreState::CompileBody;
-                            new_word = token.to_string();
+                            new_word = token;
                         },
                         CoreState::Normal => self.call_by_name(token),
                         CoreState::CompileBody => {
@@ -245,7 +245,8 @@ impl ForthCore {
                             if token.eq(";") {
                                 self.state = CoreState::Normal;
 
-                                //self.add_udw("**", vec!["dup", "*"]);
+                                self.add_udw(new_word,w_list.clone());
+                                //self.add_udw("2dup", w_list.clone());
                                 println!("{} define complete",new_word);
                             } else {
                                 w_list.push(token);
@@ -294,7 +295,7 @@ fn test() {
     let mut core = ForthCore::new();
     core.init();
     println!("{:?}", core);
-    let s = "3 2 * . : 2dup dup dup ; 4 3 * .";
+    let s = "3 2 * . : 2dup dup dup ; 3 2dup * * .";
     core.interpret(s);
 }
 fn main() {
