@@ -65,31 +65,33 @@ impl Stack {
     }
 }
 #[derive(Debug)]
-struct UserDefinedWord {
-    name: &'static str,
+struct UserDefinedWord<'a> {
+    name: &'a  str,
     //func: fn(&mut ForthCore, defines: &Vec<usize>),
     defines: Vec<usize>,
 }
 
 
-struct CompileWord {
+struct CompileWord<'a> {
     name: &'static str,
-    func: fn(&mut ForthCore),
+    func: fn(&mut ForthCore<'a>),
 }
 
-impl CompileWord {
-    fn new(name: &'static str, func: fn(&mut ForthCore)) -> Self { Self { name, func } }
+impl<'a> CompileWord<'a> {
+    fn new(name: &'static str, func: fn(& mut ForthCore<'a>)) -> Self { 
+        Self { name, func } 
+    }
 }
-impl fmt::Debug for CompileWord {
+impl fmt::Debug for CompileWord<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.name)
     }
 }
 #[derive(Debug)]
-enum ForthWord {
+enum ForthWord<'a> {
     Inner(InnerWord),
-    Udw(UserDefinedWord),
-    Compiler(CompileWord),
+    Udw(UserDefinedWord<'a>),
+    Compiler(CompileWord<'a>),
 }
 
 #[derive(Debug)]
@@ -99,10 +101,10 @@ enum CoreState {
     CompileBody,
 }
 #[derive(Debug)]
-struct ForthCore {
+struct ForthCore<'a> {
     stack: Stack,
     //v: Vec<fn()>,
-    words: Vec<Box<ForthWord>>,
+    words: Vec<Box<ForthWord<'a>>>,
     state: CoreState,
 }
 #[derive(Clone, Copy, Debug)]
@@ -113,8 +115,8 @@ enum WordType {
     Imed, //immediate
 }
 
-impl ForthCore {
-    pub fn add_udw(&mut self, name: &'static str, def: Vec<&str>) {
+impl<'a> ForthCore<'a> {
+    pub fn add_udw(&mut self, name: &'a str, def: Vec<&str>) {
         let mut defines = Vec::<usize>::new();
         for n in def {
             let w = self.find(n).unwrap();
@@ -125,7 +127,7 @@ impl ForthCore {
             //func: Self::exec_udw,
             defines,
         };
-        self.words.push(Box::new(ForthWord::Udw(udw)));
+        self.words.push(Box::new(ForthWord::<'a>::Udw(udw)));
     }
     fn init(&mut self) {
         let mut add_inner_word = |word| {
@@ -154,12 +156,13 @@ impl ForthCore {
             wtype: WordType::Internal,
         });
         self.add_udw("**", vec!["dup", "*"]);
+
         let d_word = CompileWord::new(":",Self::define_word);
         self.words.push(Box::new(ForthWord::Compiler(d_word)));
         let end_def = CompileWord::new(";",Self::end_of_define);
         self.words.push(Box::new(ForthWord::Compiler(end_def)));
     }
-    fn new() -> ForthCore {
+    fn new() -> ForthCore<'a> {
         ForthCore {
             stack: Stack::new(),
             //v: Vec::new(),
@@ -249,9 +252,10 @@ impl<'a> Iterator for Tokenizer<'a> {
     }
 }
 
-fn interpret(core: &mut ForthCore, s: &'static str) {
-    let tokenizer = Tokenizer::new(s);
-    let mut new_word: &'static str = "";
+fn interpret<'a>(core: &mut ForthCore<'a>, s: &'a String) {
+    //let tokenizer = Tokenizer::new(s);
+    let tokenizer = s.split_whitespace();
+    let mut new_word: & str = "";
     let mut w_list = Vec::<&str>::new();
     for token in tokenizer {
         match token.parse::<i32>() {
@@ -270,7 +274,7 @@ fn interpret(core: &mut ForthCore, s: &'static str) {
                         if token.eq(";") {
                             core.state = CoreState::Normal;
 
-                            core.add_udw(new_word,w_list.clone());
+                            core.add_udw(new_word.clone(),w_list.clone());
                             //self.add_udw("2dup", w_list.clone());
                             println!("{} define complete",new_word);
                         } else {
@@ -300,7 +304,7 @@ fn test() {
     core.init();
     println!("{:?}", core);
     let s = "3 2 * . : 2dup dup dup ; 3 2dup * * .";
-    interpret(&mut core,s);
+    interpret(&mut core,&s.to_string());
 }
 fn main() {
     test()
