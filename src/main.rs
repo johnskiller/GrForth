@@ -1,3 +1,5 @@
+use std::io::stdin;
+use std::io::Read;
 use std::fmt;
 use std::ops::Deref;
 
@@ -97,8 +99,8 @@ enum ForthWord<'a> {
 #[derive(Debug)]
 enum CoreState {
     Normal,
-    CompileName,
-    CompileBody,
+    CustomInit,
+    Custom,
 }
 #[derive(Debug)]
 struct ForthCore<'a> {
@@ -185,7 +187,7 @@ impl<'a> ForthCore<'a> {
     }
 
     fn define_word(&mut self) {
-        self.state = CoreState::CompileName;
+        self.state = CoreState::CustomInit;
         print!("define a new word ");
     }
 
@@ -263,13 +265,13 @@ fn interpret<'a>(core: &mut ForthCore<'a>, s: &'a String) {
             Err(_) => {
                 //println!("will run:[{}]", token);
                 match core.state {
-                    CoreState::CompileName => {
+                    CoreState::CustomInit => {
                         println!("{}",token);
-                        core.state = CoreState::CompileBody;
+                        core.state = CoreState::Custom;
                         new_word = token;
                     },
                     CoreState::Normal => core.call_by_name(token),
-                    CoreState::CompileBody => {
+                    CoreState::Custom => {
                         println!("body: {}",token);
                         if token.eq(";") {
                             core.state = CoreState::Normal;
@@ -304,7 +306,18 @@ fn test() {
     core.init();
     println!("{:?}", core);
     let s = "3 2 * . : 2dup dup dup ; 3 2dup * * .";
-    interpret(&mut core,&s.to_string());
+    let input = &s.to_string();
+    interpret(&mut core,input);
+
+    let mut buffer = String::new();
+
+    print!("OK.");
+    stdin().read_line(&mut buffer);
+
+    interpret(&mut core,&buffer);
+    println!("we got {}",buffer);
+    println!("{:?}", core);
+    
 }
 fn main() {
     test()
