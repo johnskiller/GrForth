@@ -1,7 +1,10 @@
+use crate::stack::Stack;
 use std::io::stdin;
 use std::io::Read;
 use std::fmt;
 use std::ops::Deref;
+
+mod stack;
 
 #[derive(Clone)]
 struct InnerWord {
@@ -21,51 +24,7 @@ impl fmt::Debug for InnerWord {
         write!(f, "{}", self.name)
     }
 }
-#[derive(Debug)]
-struct Stack {
-    data_stack: Vec<i32>,
-}
 
-impl Stack {
-    fn new() -> Stack {
-        Stack {
-            data_stack: Vec::<i32>::new(),
-        }
-    }
-    fn push(&mut self, d: i32) {
-        self.data_stack.push(d);
-    }
-
-    fn pop(&mut self) -> i32 {
-        match self.data_stack.pop() {
-            Some(x) => x,
-            None => panic!("stack is empty"),
-        }
-    }
-
-    fn dup(&mut self) {
-        let x = self.pop();
-        self.data_stack.push(x);
-        self.data_stack.push(x);
-    }
-    fn swap(&mut self) {
-        let x = self.pop();
-        let y = self.pop();
-        self.push(y);
-        self.push(x);
-    }
-
-    fn mul(&mut self) {
-        let x = self.pop();
-        let y = self.pop();
-
-        self.push(x * y);
-    }
-    fn disp(&mut self) {
-        let x = self.pop();
-        print!("{:?} ", x);
-    }
-}
 #[derive(Debug)]
 struct UserDefinedWord<'a> {
     name: &'a  str,
@@ -73,7 +32,14 @@ struct UserDefinedWord<'a> {
     defines: Vec<usize>,
 }
 
-
+impl<'a> UserDefinedWord<'a> {
+    fn exec(&self, core:&mut ForthCore) {
+        for d in &self.defines {
+            //println!("find at pos:{}", d);
+            core.call_by_pos(*d);
+        } 
+    }
+}
 struct CompileWord<'a> {
     name: &'static str,
     func: fn(&mut ForthCore<'a>),
@@ -131,12 +97,12 @@ impl<'a> ForthCore<'a> {
         };
         self.words.push(Box::new(ForthWord::<'a>::Udw(udw)));
     }
-    fn init(&mut self) {
+    fn init_dict() -> Vec<Box<ForthWord<'a>>> {
+        let mut dict = Vec::<Box<ForthWord>>::new();
         let mut add_inner_word = |word| {
             //let w = Box::new(ForthWord::Inner(word));
-            self.words.push(Box::new(ForthWord::Inner(word)));
+            dict.push(Box::new(ForthWord::Inner(word)));
         };
-
         add_inner_word(InnerWord {
             name: "swap",
             func: Stack::swap,
@@ -157,18 +123,20 @@ impl<'a> ForthCore<'a> {
             func: Stack::dup,
             wtype: WordType::Internal,
         });
-        self.add_udw("**", vec!["dup", "*"]);
+        //self.add_udw("**", vec!["dup", "*"]);
 
         let d_word = CompileWord::new(":",Self::define_word);
-        self.words.push(Box::new(ForthWord::Compiler(d_word)));
+        dict.push(Box::new(ForthWord::Compiler(d_word)));
         let end_def = CompileWord::new(";",Self::end_of_define);
-        self.words.push(Box::new(ForthWord::Compiler(end_def)));
+        dict.push(Box::new(ForthWord::Compiler(end_def)));
+
+        dict
     }
-    fn new() -> ForthCore<'a> {
+    fn new(dict:Vec<Box<ForthWord<'a>>>) -> ForthCore<'a> {
         ForthCore {
             stack: Stack::new(),
             //v: Vec::new(),
-            words: Vec::<Box<ForthWord>>::new(),
+            words: dict,
             state: CoreState::Normal,
         }
     }
@@ -186,6 +154,7 @@ impl<'a> ForthCore<'a> {
         }
     }
 
+
     fn define_word(&mut self) {
         self.state = CoreState::CustomInit;
         print!("define a new word ");
@@ -193,6 +162,13 @@ impl<'a> ForthCore<'a> {
 
     fn end_of_define(&mut self) {
         self.state = CoreState::Normal;
+    }
+    fn exec(core: &mut ForthCore, w:&UserDefinedWord) {
+        let defs = w.defines.clone();
+                for d in defs {
+                    //println!("find at pos:{}", d);
+                    core.call_by_pos(d);
+                }
     }
     fn call_by_pos(&mut self, pos: usize) {
         let _len = self.words.len();
@@ -210,6 +186,8 @@ impl<'a> ForthCore<'a> {
                     //println!("find at pos:{}", d);
                     self.call_by_pos(d);
                 }
+                //w.exec(self);
+                //ForthCore::exec(self,w);
             }
             ForthWord::Compiler(w) => {
                 //println!("call word: {}", w.name);
@@ -234,25 +212,7 @@ impl<'a> ForthCore<'a> {
     }
 
 }
-struct Tokenizer<'a> {
-    tokens: std::str::SplitWhitespace<'a>,
-}
 
-impl<'a> Tokenizer<'a> {
-    //fn new(tokens: Vec<String>) -> Self { Self { tokens } }
-
-    fn new(input: &'a str) -> Self {
-        let tokens = input.split_whitespace();
-        Tokenizer { tokens }
-    }
-}
-
-impl<'a> Iterator for Tokenizer<'a> {
-    type Item = &'a str;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.tokens.next()
-    }
-}
 
 fn interpret<'a>(core: &mut ForthCore<'a>, s: &'a String) {
     //let tokenizer = Tokenizer::new(s);
@@ -291,19 +251,26 @@ fn interpret<'a>(core: &mut ForthCore<'a>, s: &'a String) {
         //println!("[{}]",token);
     }
 }
-fn test2() {
-    let mut tokenizer = Tokenizer::new(": abc 52 dup * . ;");
-    assert_eq!(Some(":"),tokenizer.next());
-    
-    for x in tokenizer.into_iter() {
-        println!("{}", x);
+
+struct Interpretor {
+    name: &'static str,
+}
+
+impl Interpretor {
+    fn exec(&self, core: &mut ForthCore) {
+        core.call_by_pos(1);
     }
+}
+
+fn call(core: &mut ForthCore) {
+    core.call_by_pos(1);
 }
 
 fn test() {
     println!("Hello, world!");
-    let mut core = ForthCore::new();
-    core.init();
+    let mut core = ForthCore::new(ForthCore::init_dict());
+    //core.init();
+    core.add_udw("**", vec!["dup", "*"]);
     println!("{:?}", core);
     let s = "3 2 * . : 2dup dup dup ; 3 2dup * * .";
     let input = &s.to_string();
