@@ -1,14 +1,14 @@
 use crate::stack::Stack;
 use std::io::stdin;
-use std::io::Read;
 use std::fmt;
 use std::ops::Deref;
+use std::io::prelude::*;
 
 mod stack;
 
 #[derive(Clone)]
 struct InnerWord {
-    name: &'static str,
+    name: String,
     func: fn(&mut Stack),
     wtype: WordType,
 }
@@ -26,13 +26,13 @@ impl fmt::Debug for InnerWord {
 }
 
 #[derive(Debug)]
-struct UserDefinedWord<'a> {
-    name: &'a  str,
+struct UserDefinedWord {
+    name: String,
     //func: fn(&mut ForthCore, defines: &Vec<usize>),
     defines: Vec<usize>,
 }
 
-impl<'a> UserDefinedWord<'a> {
+impl<'a> UserDefinedWord {
     fn exec(&self, core:&mut ForthCore) {
         for d in &self.defines {
             //println!("find at pos:{}", d);
@@ -41,13 +41,13 @@ impl<'a> UserDefinedWord<'a> {
     }
 }
 struct CompileWord<'a> {
-    name: &'static str,
+    name: String,
     func: fn(&mut ForthCore<'a>),
 }
 
 impl<'a> CompileWord<'a> {
     fn new(name: &'static str, func: fn(& mut ForthCore<'a>)) -> Self { 
-        Self { name, func } 
+        Self { name: name.to_string(), func } 
     }
 }
 impl fmt::Debug for CompileWord<'_> {
@@ -58,7 +58,7 @@ impl fmt::Debug for CompileWord<'_> {
 #[derive(Debug)]
 enum ForthWord<'a> {
     Inner(InnerWord),
-    Udw(UserDefinedWord<'a>),
+    Udw(UserDefinedWord),
     Compiler(CompileWord<'a>),
 }
 
@@ -84,12 +84,13 @@ enum WordType {
 }
 
 impl<'a> ForthCore<'a> {
-    pub fn add_udw(&mut self, name: &'a str, def: Vec<&str>) {
+    pub fn add_udw(&mut self, name: String, def: Vec<&str>) {
         let mut defines = Vec::<usize>::new();
         for n in def {
             let w = self.find(n).unwrap();
             defines.push(w);
         }
+        //let name = String::from(name);
         let udw = UserDefinedWord {
             name,
             //func: Self::exec_udw,
@@ -104,22 +105,22 @@ impl<'a> ForthCore<'a> {
             dict.push(Box::new(ForthWord::Inner(word)));
         };
         add_inner_word(InnerWord {
-            name: "swap",
+            name: "swap".to_string(),
             func: Stack::swap,
             wtype: WordType::Internal,
         });
         add_inner_word(InnerWord {
-            name: ".",
+            name: ".".to_string(),
             func: Stack::disp,
             wtype: WordType::Internal,
         });
         add_inner_word(InnerWord {
-            name: "*",
+            name: "*".to_string(),
             func: Stack::mul,
             wtype: WordType::Internal,
         });
         add_inner_word(InnerWord {
-            name: "dup",
+            name: "dup".to_string(),
             func: Stack::dup,
             wtype: WordType::Internal,
         });
@@ -214,12 +215,63 @@ impl<'a> ForthCore<'a> {
 }
 
 
-fn interpret<'a>(core: &mut ForthCore<'a>, s: &'a String) {
+fn  interpret<'b>(core: &mut ForthCore<'b>, s:String) {
     //let tokenizer = Tokenizer::new(s);
+    
     let tokenizer = s.split_whitespace();
-    let mut new_word: & str = "";
+    let mut new_word = String::new();
     let mut w_list = Vec::<&str>::new();
+
     for token in tokenizer {
+        match core.find(token) {
+            Some(n) => {
+                match core.state {
+                    CoreState::Normal => core.call_by_pos(n),
+                    CoreState::CustomInit => {
+                        println!("{} redefined",token);
+                        new_word = String::from(token);  // duplicate word, redefine
+                        core.state = CoreState::Custom;
+                    },
+                    CoreState::Custom => {
+                        if token.eq(";") {
+                            core.state = CoreState::Normal;
+
+                            core.add_udw(new_word.clone(),w_list.clone());
+                            // clear new_word and w_list
+                            new_word = String::new();
+                            w_list = Vec::<&str>::new();
+                            //self.add_udw("2dup", w_list.clone());
+                            println!("{} define complete",new_word);
+                        } else {
+                            w_list.push(token);
+                        }
+                    },
+                }
+            }, 
+            None => {    // not found
+                match core.state {
+                    CoreState::CustomInit => {
+                        core.state = CoreState::Custom;
+                        new_word = String::from(token);
+                        println!("{}",token);
+                    },
+
+                    CoreState::Normal => {
+                        match token.parse::<i32>() {
+                            Ok(n) => core.stack.push(n),
+                            Err(_) => println!("Unknown word"),
+                        }
+                    } 
+                    CoreState::Custom => {
+                        match token.parse::<i32>() {
+                            Ok(n) => println!("Lit"),
+                            Err(_) => panic!("Unknown word when define"),
+                        }
+                    }
+                }
+            }
+        }
+        /*
         match token.parse::<i32>() {
             Ok(x) => core.push(x),
             Err(_) => {
@@ -228,7 +280,8 @@ fn interpret<'a>(core: &mut ForthCore<'a>, s: &'a String) {
                     CoreState::CustomInit => {
                         println!("{}",token);
                         core.state = CoreState::Custom;
-                        new_word = token;
+                        new_word = String::from(token);
+                        w_list = Vec::<&str>::new();
                     },
                     CoreState::Normal => core.call_by_name(token),
                     CoreState::Custom => {
@@ -236,7 +289,7 @@ fn interpret<'a>(core: &mut ForthCore<'a>, s: &'a String) {
                         if token.eq(";") {
                             core.state = CoreState::Normal;
 
-                            core.add_udw(new_word.clone(),w_list.clone());
+                            core.add_udw(&new_word,w_list);
                             //self.add_udw("2dup", w_list.clone());
                             println!("{} define complete",new_word);
                         } else {
@@ -247,20 +300,12 @@ fn interpret<'a>(core: &mut ForthCore<'a>, s: &'a String) {
                 }
                 
             }
-        }
+        } */
         //println!("[{}]",token);
     }
 }
 
-struct Interpretor {
-    name: &'static str,
-}
 
-impl Interpretor {
-    fn exec(&self, core: &mut ForthCore) {
-        core.call_by_pos(1);
-    }
-}
 
 fn call(core: &mut ForthCore) {
     core.call_by_pos(1);
@@ -270,22 +315,33 @@ fn test() {
     println!("Hello, world!");
     let mut core = ForthCore::new(ForthCore::init_dict());
     //core.init();
-    core.add_udw("**", vec!["dup", "*"]);
+    core.add_udw("**".to_string(), vec!["dup", "*"]);
     println!("{:?}", core);
     let s = "3 2 * . : 2dup dup dup ; 3 2dup * * .";
-    let input = &s.to_string();
+    let input = s.to_string();
     interpret(&mut core,input);
+    println!("{:?}", core);
 
-    let mut buffer = String::new();
-
-    print!("OK.");
-    stdin().read_line(&mut buffer);
-
-    interpret(&mut core,&buffer);
-    println!("we got {}",buffer);
+    loop {
+            let line = readline();
+            interpret(&mut core, line);
+    }
     println!("{:?}", core);
     
 }
+
+fn readline() -> String {
+    let stdin = std::io::stdin();
+
+    let input = stdin.lock().lines().next();
+
+    input
+        .expect("No lines in buffer")
+        .expect("Failed to read line")
+        .trim()
+        .to_string()
+}
+
 fn main() {
     test()
 }
