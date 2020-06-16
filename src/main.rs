@@ -1,7 +1,6 @@
 use crate::stack::Stack;
 use std::io::stdin;
 use std::fmt;
-use std::ops::Deref;
 use std::io::prelude::*;
 
 mod stack;
@@ -72,7 +71,7 @@ enum CoreState {
 struct ForthCore<'a> {
     stack: Stack,
     //v: Vec<fn()>,
-    words: Vec<Box<ForthWord<'a>>>,
+    words: Vec<ForthWord<'a>>,
     state: CoreState,
 }
 #[derive(Clone, Copy, Debug)]
@@ -96,13 +95,13 @@ impl<'a> ForthCore<'a> {
             //func: Self::exec_udw,
             defines,
         };
-        self.words.push(Box::new(ForthWord::<'a>::Udw(udw)));
+        self.words.push(ForthWord::<'a>::Udw(udw));
     }
-    fn init_dict() -> Vec<Box<ForthWord<'a>>> {
-        let mut dict = Vec::<Box<ForthWord>>::new();
+    fn init_dict() -> Vec<ForthWord<'a>> {
+        let mut dict = Vec::<ForthWord>::new();
         let mut add_inner_word = |word| {
             //let w = Box::new(ForthWord::Inner(word));
-            dict.push(Box::new(ForthWord::Inner(word)));
+            dict.push(ForthWord::Inner(word));
         };
         add_inner_word(InnerWord {
             name: "swap".to_string(),
@@ -127,13 +126,13 @@ impl<'a> ForthCore<'a> {
         //self.add_udw("**", vec!["dup", "*"]);
 
         let d_word = CompileWord::new(":",Self::define_word);
-        dict.push(Box::new(ForthWord::Compiler(d_word)));
+        dict.push(ForthWord::Compiler(d_word));
         let end_def = CompileWord::new(";",Self::end_of_define);
-        dict.push(Box::new(ForthWord::Compiler(end_def)));
+        dict.push(ForthWord::Compiler(end_def));
 
         dict
     }
-    fn new(dict:Vec<Box<ForthWord<'a>>>) -> ForthCore<'a> {
+    fn new(dict:Vec<ForthWord<'a>>) -> ForthCore<'a> {
         ForthCore {
             stack: Stack::new(),
             //v: Vec::new(),
@@ -143,7 +142,7 @@ impl<'a> ForthCore<'a> {
     }
 
     fn find(&self, name: &str) -> Option<usize> {
-        let word = self.words.iter().rev().position(|x| match x.deref() {
+        let word = self.words.iter().rev().position(|x| match x{
             ForthWord::Inner(w) => w.name.eq_ignore_ascii_case(name),
             ForthWord::Udw(w) => w.name.eq_ignore_ascii_case(name),
             ForthWord::Compiler(w) =>w.name.eq_ignore_ascii_case(name), 
@@ -174,7 +173,7 @@ impl<'a> ForthCore<'a> {
     fn call_by_pos(&mut self, pos: usize) {
         let _len = self.words.len();
         //println!("len: {}, pos: {}", _len, pos);
-        let word = (&self.words[pos]).deref();
+        let word = (&self.words[pos]);
         println!("ForthWord: {:?}", word);
         match word {
             ForthWord::Inner(w) => {
