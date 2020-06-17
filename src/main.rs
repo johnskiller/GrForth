@@ -10,6 +10,7 @@ struct ForthWord<'a> {
     func: fn(&mut ForthCore<'a>, pos: usize),
     defines: Vec<usize>,
     wtype: WordType,
+    immediate: bool,
 }
 
 
@@ -36,7 +37,6 @@ enum CoreState {
 #[derive(Debug)]
 struct ForthCore<'a> {
     stack: Stack,
-    //v: Vec<fn()>,
     words: Vec<ForthWord<'a>>,
     state: CoreState,
     param: Vec<i32>,
@@ -44,9 +44,11 @@ struct ForthCore<'a> {
 #[derive(Clone, Copy, Debug)]
 enum WordType {
     Internal,
-    Dict,
+    Dict, 
     Lit,
     Imed, //immediate
+    Const,
+    Var,
 }
 
 impl<'a> ForthCore<'a> {
@@ -62,6 +64,7 @@ impl<'a> ForthCore<'a> {
             func: Self::exec_udw,
             defines,
             wtype: WordType::Dict,
+            immediate: false,
         };
         self.words.push(udw);
     }
@@ -92,6 +95,7 @@ impl<'a> ForthCore<'a> {
                 func,
                 defines: vec![],
                 wtype: WordType::Internal,
+                immediate: false,
             };
             //let w = Box::new(ForthWord::Inner(word));
             dict.push(word);
@@ -117,16 +121,20 @@ impl<'a> ForthCore<'a> {
             ":".to_string(),
             Self::define_word,
         );
-        add_inner_word(
-            ";".to_string(),
-            Self::end_of_define,
-        );
-
+        let word= ForthWord {
+            name: ";".to_string(),
+            defines: vec![],
+            func: Self::end_of_define,
+            wtype: WordType::Imed,
+            immediate: true,
+        };
+        dict.push(word);
         let word= ForthWord {
             name: "lit".to_string(),
             defines: vec![],
             func: Self::do_lit,
             wtype: WordType::Lit,
+            immediate: false,
         };
         dict.push(word);
         dict
@@ -201,9 +209,9 @@ fn set_state(&mut self, state: CoreState) {
 }
 fn parse_word(& mut self, token: &str) {
     match self.find(token) {
-        Some(n) => {
+        Some(pos) => {
             match self.get_state() {
-                CoreState::Normal => self.call_by_pos(n),
+                CoreState::Normal => self.call_by_pos(pos),
                 CoreState::CustomInit => {
                     println!("{} redefined",token);
                     let new_word = String::from(token);  // duplicate word, redefine
@@ -211,11 +219,11 @@ fn parse_word(& mut self, token: &str) {
                     self.state = CoreState::Custom;
                 },
                 CoreState::Custom => {
-                    if token.eq(";") {
-                        self.state = CoreState::Normal;
-
-                        let last = &self.words[self.words.len()-1]; 
-                        println!("{} define complete",last);
+                    let immediate = self.words[pos].immediate;    
+                    if immediate {
+                         
+                        println!("exec immediate word {}",token);
+                        self.call_by_pos(pos);
                     } else {
                         self.compile(token);
                     }
