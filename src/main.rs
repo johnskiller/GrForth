@@ -1,36 +1,37 @@
 use crate::stack::Stack;
-use std::io::stdin;
 use std::fmt;
 use std::io::prelude::*;
 
 mod stack;
 
 #[derive(Clone)]
-struct InnerWord {
+struct ForthWord<'a> {
     name: String,
-    func: fn(&mut Stack),
+    func: fn(&mut ForthCore<'a>, pos: usize),
+    defines: Vec<usize>,
     wtype: WordType,
 }
 
-impl fmt::Display for InnerWord {
+
+impl<'a> fmt::Display for ForthWord<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
         write!(f, "{}", self.name)
     }
 }
 
-impl fmt::Debug for InnerWord {
+impl<'a> fmt::Debug for ForthWord<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.name)
     }
 }
 
+/*
 #[derive(Debug)]
 struct UserDefinedWord {
     name: String,
     //func: fn(&mut ForthCore, defines: &Vec<usize>),
     defines: Vec<usize>,
 }
-
 impl<'a> UserDefinedWord {
     fn exec(&self, core:&mut ForthCore) {
         for d in &self.defines {
@@ -45,7 +46,7 @@ struct CompileWord<'a> {
 }
 
 impl<'a> CompileWord<'a> {
-    fn new(name: &'static str, func: fn(& mut ForthCore<'a>)) -> Self { 
+    fn new(name: &'a str, func: fn(& mut ForthCore<'a>)) -> Self { 
         Self { name: name.to_string(), func } 
     }
 }
@@ -56,10 +57,11 @@ impl fmt::Debug for CompileWord<'_> {
 }
 #[derive(Debug)]
 enum ForthWord<'a> {
-    Inner(InnerWord),
+    Inner(InnerWord<'a>),
     Udw(UserDefinedWord),
     Compiler(CompileWord<'a>),
 }
+*/
 
 #[derive(Debug)]
 enum CoreState {
@@ -90,45 +92,65 @@ impl<'a> ForthCore<'a> {
             defines.push(w);
         }
         //let name = String::from(name);
-        let udw = UserDefinedWord {
+        let udw = ForthWord {
             name,
-            //func: Self::exec_udw,
+            func: Self::exec_udw,
             defines,
+            wtype: WordType::Dict,
         };
-        self.words.push(ForthWord::<'a>::Udw(udw));
+        self.words.push(udw);
+    }
+
+    fn do_colon(&mut self, defines: Vec<usize>) {
+
+        for d in defines {
+            self.call_by_pos(d);
+        }
+    }
+    fn exec_udw(&mut self, pos: usize) {
+        println!("UDW");
+        let word = &self.words[pos];
+        let defines = word.defines.clone();
+        self.do_colon(defines);
+        
     }
     fn init_dict() -> Vec<ForthWord<'a>> {
         let mut dict = Vec::<ForthWord>::new();
-        let mut add_inner_word = |word| {
+        let mut add_inner_word = |name, func| {
+            let word = ForthWord{
+                name,
+                func,
+                defines: vec![],
+                wtype: WordType::Internal,
+            };
             //let w = Box::new(ForthWord::Inner(word));
-            dict.push(ForthWord::Inner(word));
+            dict.push(word);
         };
-        add_inner_word(InnerWord {
-            name: "swap".to_string(),
-            func: Stack::swap,
-            wtype: WordType::Internal,
-        });
-        add_inner_word(InnerWord {
-            name: ".".to_string(),
-            func: Stack::disp,
-            wtype: WordType::Internal,
-        });
-        add_inner_word(InnerWord {
-            name: "*".to_string(),
-            func: Stack::mul,
-            wtype: WordType::Internal,
-        });
-        add_inner_word(InnerWord {
-            name: "dup".to_string(),
-            func: Stack::dup,
-            wtype: WordType::Internal,
-        });
+        add_inner_word( "swap".to_string(),
+            Self::swap,
+            );
+        add_inner_word(
+            ".".to_string(),
+            Self::disp,
+        );
+        add_inner_word(
+            "*".to_string(),
+            Self::mul,
+        );
+        add_inner_word(
+            "dup".to_string(),
+            Self::dup,
+        );
         //self.add_udw("**", vec!["dup", "*"]);
 
-        let d_word = CompileWord::new(":",Self::define_word);
-        dict.push(ForthWord::Compiler(d_word));
-        let end_def = CompileWord::new(";",Self::end_of_define);
-        dict.push(ForthWord::Compiler(end_def));
+        add_inner_word(
+            ":".to_string(),
+            Self::define_word,
+        );
+        add_inner_word(
+            ";".to_string(),
+            Self::end_of_define,
+        );
 
         dict
     }
@@ -142,11 +164,7 @@ impl<'a> ForthCore<'a> {
     }
 
     fn find(&self, name: &str) -> Option<usize> {
-        let word = self.words.iter().rev().position(|x| match x{
-            ForthWord::Inner(w) => w.name.eq_ignore_ascii_case(name),
-            ForthWord::Udw(w) => w.name.eq_ignore_ascii_case(name),
-            ForthWord::Compiler(w) =>w.name.eq_ignore_ascii_case(name), 
-        });
+        let word = self.words.iter().rev().position(|x| x.name.eq_ignore_ascii_case(name));
 
         match word {
             Some(w) => Some(self.words.len() - w - 1),
@@ -155,47 +173,31 @@ impl<'a> ForthCore<'a> {
     }
 
 
-    fn define_word(&mut self) {
+    fn define_word(&mut self, _: usize) {
         self.state = CoreState::CustomInit;
         print!("define a new word ");
     }
 
-    fn end_of_define(&mut self) {
+    fn end_of_define(&mut self,_: usize) {
         self.state = CoreState::Normal;
     }
+    /*
     fn exec(core: &mut ForthCore, w:&UserDefinedWord) {
         let defs = w.defines.clone();
                 for d in defs {
                     //println!("find at pos:{}", d);
                     core.call_by_pos(d);
                 }
-    }
+    }*/
     fn call_by_pos(&mut self, pos: usize) {
         let _len = self.words.len();
         //println!("len: {}, pos: {}", _len, pos);
-        let word = (&self.words[pos]);
-        println!("ForthWord: {:?}", word);
-        match word {
-            ForthWord::Inner(w) => {
-                //println!("call word: {}", w.name);
-                (w.func)(&mut self.stack)
-            }
-            ForthWord::Udw(w) => {
-                let defs = w.defines.clone();
-                for d in defs {
-                    //println!("find at pos:{}", d);
-                    self.call_by_pos(d);
-                }
-                //w.exec(self);
-                //ForthCore::exec(self,w);
-            }
-            ForthWord::Compiler(w) => {
-                //println!("call word: {}", w.name);
-                (w.func)(self)
-            }
-        }
+        let func = self.words[pos].func;
+        
+        println!("ForthWord: {:?}", self.words[pos]);
+        func(self,pos);
     }
-    fn call_by_name(&mut self, name: &str) {
+    fn call_by_name(&'a mut self, name: &str) {
         let pos = self.find(name);
 
         match pos {
@@ -207,108 +209,116 @@ impl<'a> ForthCore<'a> {
         }
     }
 
-    pub fn push(&mut self, value: i32) {
-        self.stack.push(value);
-    }
 
 }
 
+impl<'a> ForthCore<'a> {
 
-fn  interpret<'b>(core: &mut ForthCore<'b>, s:String) {
-    //let tokenizer = Tokenizer::new(s);
-    
-    let tokenizer = s.split_whitespace();
-    let mut new_word = String::new();
-    let mut w_list = Vec::<&str>::new();
+fn get_state(&self) -> &CoreState {
+    &self.state
+}
 
-    for token in tokenizer {
-        match core.find(token) {
-            Some(n) => {
-                match core.state {
-                    CoreState::Normal => core.call_by_pos(n),
-                    CoreState::CustomInit => {
-                        println!("{} redefined",token);
-                        new_word = String::from(token);  // duplicate word, redefine
-                        core.state = CoreState::Custom;
-                    },
-                    CoreState::Custom => {
-                        if token.eq(";") {
-                            core.state = CoreState::Normal;
+fn set_state(&mut self, state: CoreState) {
+    self.state = state;
+}
+fn parse_word(& mut self, token: &str) {
+    match self.find(token) {
+        Some(n) => {
+            match self.get_state() {
+                CoreState::Normal => self.call_by_pos(n),
+                CoreState::CustomInit => {
+                    println!("{} redefined",token);
+                    let new_word = String::from(token);  // duplicate word, redefine
+                    self.add_udw(new_word.clone(),Vec::<&str>::new());
+                    self.state = CoreState::Custom;
+                },
+                CoreState::Custom => {
+                    if token.eq(";") {
+                        self.state = CoreState::Normal;
 
-                            core.add_udw(new_word.clone(),w_list.clone());
-                            // clear new_word and w_list
-                            new_word = String::new();
-                            w_list = Vec::<&str>::new();
-                            //self.add_udw("2dup", w_list.clone());
-                            println!("{} define complete",new_word);
-                        } else {
-                            w_list.push(token);
-                        }
-                    },
-                }
-            }, 
-            None => {    // not found
-                match core.state {
-                    CoreState::CustomInit => {
-                        core.state = CoreState::Custom;
-                        new_word = String::from(token);
-                        println!("{}",token);
-                    },
+                        let last = &self.words[self.words.len()-1]; 
+                        println!("{} define complete",last);
+                    } else {
+                        let pos = self.find(token).unwrap();
+                        let len = self.words.len();
+                        let defines = &mut self.words[len-1].defines;
+                        defines.push(pos);
+                    }
+                },
+            }
+        }, 
+        None => {    // not found
+            match self.state {
+                CoreState::CustomInit => {
+                    println!("{} define ",token);
+                    let new_word = String::from(token);
+                    self.add_udw(new_word.clone(),Vec::<&str>::new());
+                    self.state = CoreState::Custom;
+                },
 
-                    CoreState::Normal => {
-                        match token.parse::<i32>() {
-                            Ok(n) => core.stack.push(n),
-                            Err(_) => println!("Unknown word"),
-                        }
-                    } 
-                    CoreState::Custom => {
-                        match token.parse::<i32>() {
-                            Ok(n) => println!("Lit"),
-                            Err(_) => panic!("Unknown word when define"),
-                        }
+                CoreState::Normal => {
+                    match token.parse::<i32>() {
+                        Ok(n) => {println!("{} pushed",n);self.stack.push(n)},
+                        Err(_) => println!("Unknown word: {}",token),
+                    }
+                } 
+                CoreState::Custom => {
+                    match token.parse::<i32>() {
+                        Ok(n) => println!("Lit {}",n),
+                        Err(_) => panic!("Unknown word when define:{}",token),
                     }
                 }
             }
         }
-        /*
-        match token.parse::<i32>() {
-            Ok(x) => core.push(x),
-            Err(_) => {
-                //println!("will run:[{}]", token);
-                match core.state {
-                    CoreState::CustomInit => {
-                        println!("{}",token);
-                        core.state = CoreState::Custom;
-                        new_word = String::from(token);
-                        w_list = Vec::<&str>::new();
-                    },
-                    CoreState::Normal => core.call_by_name(token),
-                    CoreState::Custom => {
-                        println!("body: {}",token);
-                        if token.eq(";") {
-                            core.state = CoreState::Normal;
+    }
+}
+fn  interpret(& mut self, s:String) {
+    //let tokenizer = Tokenizer::new(s);
+    
+    let tokenizer = s.split_whitespace();
+    //let mut new_word = String::new();
+    //let mut w_list = Vec::<&str>::new();
 
-                            core.add_udw(&new_word,w_list);
-                            //self.add_udw("2dup", w_list.clone());
-                            println!("{} define complete",new_word);
-                        } else {
-                            w_list.push(token);
-                        }
-                    }
+    for token in tokenizer {
+       self.parse_word(token);
+  
+    }
+}
 
-                }
-                
-            }
-        } */
-        //println!("[{}]",token);
+    pub fn push(&mut self, d: i32) {
+        self.stack.push(d);
+    }
+
+    fn pop(&mut self) -> i32 {
+        self.stack.pop() 
+    }
+
+    pub fn dup(&mut self, _: usize) {
+        let x = self.pop();
+        self.stack.push(x);
+        self.stack.push(x);
+    }
+    pub fn swap(&mut self, _: usize) {
+        let x = self.pop();
+        let y = self.pop();
+        self.push(y);
+        self.push(x);
+    }
+
+    pub fn mul(&mut self, _: usize) {
+        let x = self.pop();
+        let y = self.pop();
+
+        self.push(x * y);
+    }
+    pub fn disp(&mut self, _: usize) {
+        let x = self.pop();
+        print!("{:?} ", x);
     }
 }
 
 
 
-fn call(core: &mut ForthCore) {
-    core.call_by_pos(1);
-}
 
 fn test() {
     println!("Hello, world!");
@@ -318,12 +328,12 @@ fn test() {
     println!("{:?}", core);
     let s = "3 2 * . : 2dup dup dup ; 3 2dup * * .";
     let input = s.to_string();
-    interpret(&mut core,input);
-    println!("{:?}", core);
+    core.interpret(input);
+    //println!("{:?}", core);
 
     loop {
             let line = readline();
-            interpret(&mut core, line);
+            core.interpret(line);
     }
     println!("{:?}", core);
     
