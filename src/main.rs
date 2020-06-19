@@ -4,11 +4,13 @@ use std::io::prelude::*;
 
 mod stack;
 
+type Defines = Vec<usize>;
+
 #[derive(Clone)]
 struct ForthWord<'a> {
     name: String,
-    func: fn(&mut ForthCore<'a>, pos: usize),
-    defines: Vec<usize>,
+    func: fn(&mut ForthCore<'a>, defines: &Defines),
+    defines: Defines,
     wtype: WordType,
     immediate: bool,
 }
@@ -86,11 +88,11 @@ impl<'a> ForthCore<'a> {
         println!("push {} to data stack", n);
     } */
 
-    fn do_exit(&mut self, _: usize) {
+    fn do_exit(&mut self, _: &Defines) {
         // pop from param stack
         //self.param.pop().unwrap();
     }
-    fn do_colon(&mut self, defines: Vec<usize>) {
+    fn do_colon(&mut self, defines: &Defines) {
         let mut iter = defines.iter();
         while let Some(&d) = iter.next() {
             
@@ -102,12 +104,10 @@ impl<'a> ForthCore<'a> {
             }
         }
     }
-    fn exec_udw(&mut self, pos: usize) {
+    fn exec_udw(&mut self, defines: &Defines) {
         println!("UDW");
         // push current pos to param stack
         //self.param.push(pos);
-        let word = &self.words[pos];
-        let defines = word.defines.clone();
         self.do_colon(defines);
     }
     fn init_dict() -> Vec<ForthWord<'a>> {
@@ -176,12 +176,12 @@ impl<'a> ForthCore<'a> {
         }
     }
 
-    fn define_word(&mut self, _: usize) {
+    fn define_word(&mut self, _: &Defines) {
         self.state = CoreState::CustomInit;
         print!("define a new word ");
     }
 
-    fn end_of_define(&mut self, _: usize) {
+    fn end_of_define(&mut self, _: &Defines) {
         self.state = CoreState::Normal;
         self.compile("exit");
     }
@@ -197,9 +197,10 @@ impl<'a> ForthCore<'a> {
         let _len = self.words.len();
         //println!("len: {}, pos: {}", _len, pos);
         let func = self.words[pos].func;
+        let defines = &self.words[pos].defines.clone();
         println!("ForthWord: {:?}", self.words[pos]);
 
-        func(self, pos);
+        func(self, defines);
     }
     fn call_by_name(&'a mut self, name: &str) {
         let pos = self.find(name);
@@ -310,37 +311,37 @@ impl<'a> ForthCore<'a> {
         self.stack.pop()
     }
 
-    pub fn dup(&mut self, _: usize) {
+    pub fn dup(&mut self, _: &Defines) {
         let x = self.pop();
         self.stack.push(x);
         self.stack.push(x);
     }
-    pub fn swap(&mut self, _: usize) {
+    pub fn swap(&mut self, _: &Defines) {
         let x = self.pop();
         let y = self.pop();
         self.push(y);
         self.push(x);
     }
 
-    pub fn mul(&mut self, _: usize) {
+    pub fn mul(&mut self, _: &Defines) {
         let x = self.pop();
         let y = self.pop();
 
         self.push(x * y);
     }
-    pub fn disp(&mut self, _: usize) {
+    pub fn disp(&mut self, _: &Defines) {
         let x = self.pop();
         print!("{:?} ", x);
     }
 
-    pub fn emit(&mut self, _: usize) {
-        let x = self.pop() as u8;
-        print!("{}",x);
+    pub fn emit(&mut self, _: &Defines) {
+        let x = self.pop() as u8 as char;
+        print!("emit:{}",x);
     }
 
-    pub fn cr(&mut self, _: usize) {
+    pub fn cr(&mut self, defines: &Defines) {
         self.push('\r' as i32);
-        self.emit(0);
+        self.emit(defines);
     }
 }
 
