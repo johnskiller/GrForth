@@ -73,6 +73,7 @@ impl<'a> ForthCore<'a> {
         };
         self.words.push(udw);
     }
+    /*    
     fn do_lit(&mut self, _: usize) {
         println!("DOLIT {:?}", self);
         // how to get next word from defines that use lit?
@@ -83,21 +84,28 @@ impl<'a> ForthCore<'a> {
         let n = caller_defs[0];
         self.push(n as i32);
         println!("push {} to data stack", n);
-    }
+    } */
 
     fn do_exit(&mut self, _: usize) {
         // pop from param stack
-        self.param.pop().unwrap();
+        //self.param.pop().unwrap();
     }
     fn do_colon(&mut self, defines: Vec<usize>) {
-        for d in defines {
-            self.call_by_pos(d);
+        let mut iter = defines.iter();
+        while let Some(&d) = iter.next() {
+            
+            if d == 9999 {  // LIT
+                let lit = iter.next().unwrap();
+                self.push(*lit as i32);
+            } else {
+               self.call_by_pos(d);
+            }
         }
     }
     fn exec_udw(&mut self, pos: usize) {
         println!("UDW");
         // push current pos to param stack
-        self.param.push(pos);
+        //self.param.push(pos);
         let word = &self.words[pos];
         let defines = word.defines.clone();
         self.do_colon(defines);
@@ -123,6 +131,8 @@ impl<'a> ForthCore<'a> {
         //self.add_udw("**", vec!["dup", "*"]);
 
         add_inner_word(":", Self::define_word);
+        add_inner_word("emit", Self::emit);
+        add_inner_word("cr", Self::cr);
         let word = ForthWord {
             name: ";".to_string(),
             defines: vec![],
@@ -131,14 +141,16 @@ impl<'a> ForthCore<'a> {
             immediate: true,
         };
         dict.push(word);
+        /*
         let word = ForthWord {
             name: "lit".to_string(),
             defines: vec![],
             func: Self::do_lit,
             wtype: WordType::Lit,
             immediate: false,
-        };
+        }; 
         dict.push(word);
+        */
         dict
     }
     fn new(dict: Vec<ForthWord<'a>>) -> ForthCore<'a> {
@@ -255,7 +267,8 @@ impl<'a> ForthCore<'a> {
                                 //println!("push Lit {} to param stack",n);
                                 //self.param.push(n);
 
-                                self.compile("lit");
+                                //self.compile("lit");
+                                self.compile_lit(9999);
                                 self.compile_lit(n as usize);
                             }
                             Err(_) => panic!("Unknown word when define:{}", token),
@@ -319,6 +332,16 @@ impl<'a> ForthCore<'a> {
         let x = self.pop();
         print!("{:?} ", x);
     }
+
+    pub fn emit(&mut self, _: usize) {
+        let x = self.pop() as u8;
+        print!("{}",x);
+    }
+
+    pub fn cr(&mut self, _: usize) {
+        self.push('\r' as i32);
+        self.emit(0);
+    }
 }
 
 fn test() {
@@ -342,6 +365,7 @@ fn test() {
 fn readline() -> String {
     let stdin = std::io::stdin();
 
+    print!("Ok. ");
     let input = stdin.lock().lines().next();
 
     input
