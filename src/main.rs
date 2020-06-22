@@ -11,12 +11,13 @@ fn test() {
     //core.init();
     core.add_udw("**".to_string(), vec!["dup", "*"]);
     println!("{:?}", core);
-    let s = "3 2 * . : 3x 3 * ; 4 3x .";
+    let s = "3 2 * . : 3x 3 * ; 4 3x . cr";
     let input = s.to_string();
     core.interpret(input);
     //println!("{:?}", core);
 
     loop {
+        print!("Ok. ");
         let line = readline();
         core.interpret(line);
     }
@@ -26,7 +27,6 @@ fn test() {
 fn readline() -> String {
     let stdin = std::io::stdin();
 
-    print!("Ok. ");
     let input = stdin.lock().lines().next();
 
     input

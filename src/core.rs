@@ -8,7 +8,7 @@ const LITERAL: usize = 9999;
 #[derive(Clone)]
 pub struct ForthWord<'a> {
     name: String,
-    func: fn(&mut ForthCore<'a>, defines: &Defines),
+    func: fn(&mut ForthCore<'a>, defines: &ForthWord),
     defines: Defines,
     wtype: WordType,
     immediate: bool,
@@ -18,18 +18,19 @@ impl<'a> fmt::Display for ForthWord<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
         write!(
             f,
-            "name:{} defines:{:?} immediate?{}",
-            self.name, self.defines, self.immediate
+            ":{:<8} defines:{:?} {:?} immediate?{}",
+            self.name, self.defines, self.wtype, self.immediate
         )
     }
 }
 
 impl<'a> fmt::Debug for ForthWord<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+
         write!(
             f,
-            "name:{} defines:{:?} immediate?{}",
-            self.name, self.defines, self.immediate
+            "{:<8} {:?} {:?} immediate?{}",
+            self.name, self.wtype, self.defines, self.immediate
         )
     }
 }
@@ -45,7 +46,7 @@ pub struct ForthCore<'a> {
     stack: Stack,
     words: Vec<ForthWord<'a>>,
     state: CoreState,
-    param: Vec<usize>,
+    return_stack: Vec<usize>,
     input: Option<std::str::SplitWhitespace<'a>>,
 }
 #[derive(Clone, Copy, Debug)]
@@ -88,13 +89,14 @@ impl<'a> ForthCore<'a> {
         println!("push {} to data stack", n);
     } */
 
-    fn do_exit(&mut self, _: &Defines) {
+    fn do_exit(&mut self, _: &ForthWord) {
         // pop from param stack
         //self.param.pop().unwrap();
     }
-    fn do_colon(&mut self, defines: &Defines) {
-        println!("UDW");
-        let mut iter = defines.iter();
+    fn do_colon(&mut self, word: &ForthWord) {
+        println!("do_colon");
+        
+        let mut iter = word.defines.iter();
         while let Some(&d) = iter.next() {
             if d == LITERAL {
                 // LIT
@@ -133,6 +135,7 @@ impl<'a> ForthCore<'a> {
         add_inner_word("emit", Self::emit, false);
         add_inner_word("cr", Primv::cr, false);
         add_inner_word("const", Self::define_const, false);
+        add_inner_word("words", Self::do_words, false);
 
         
         /*
@@ -153,7 +156,7 @@ impl<'a> ForthCore<'a> {
             //v: Vec::new(),
             words: dict,
             state: CoreState::Normal,
-            param: Vec::<usize>::new(),
+            return_stack: Vec::<usize>::new(),
             input: None,
         }
     }
@@ -192,25 +195,33 @@ impl<'a> ForthCore<'a> {
         self.last_word().immediate = true;
     }
 
-    fn do_const(&mut self, defines: &Defines) {
-        self.push(defines[0] as i32);
+    fn do_const(&mut self, word: &ForthWord) {
+        self.push(word.defines[0] as i32);
     }
-    fn define_const(&mut self, _: &Defines) {
+    fn define_const(&mut self, _: &ForthWord) {
         self.state = CoreState::CustomInit;
         print!("define a const ");
         self.create();
         self.last_word().func = Self::do_const;
+        self.last_word().wtype = WordType::Const;
         let const_value = self.pop(); 
         self.compile_lit(const_value as usize);
     }
-    fn define_word(&mut self, _: &Defines) {
+    fn define_word(&mut self, _: &ForthWord) {
         self.state = CoreState::CustomInit;
         print!("define a new word ");
         self.create();
         self.last_word().func = Self::do_colon;
     }
 
-    fn end_of_define(&mut self, _: &Defines) {
+    fn do_words(&mut self, _: &ForthWord) {
+        for (i, w) in self.words.iter().enumerate() {
+           
+            println!("{:>4}: {:?}", i, w);
+        }
+    }
+
+    fn end_of_define(&mut self, _: &ForthWord) {
         self.state = CoreState::Normal;
         self.compile("exit");
     }
@@ -223,13 +234,15 @@ impl<'a> ForthCore<'a> {
                 }
     }*/
     fn call_by_pos(&mut self, pos: usize) {
-        let _len = self.words.len();
+        //let _len = self.words.len();
         //println!("len: {}, pos: {}", _len, pos);
-        let func = self.words[pos].func;
-        let defines = &self.words[pos].defines.clone();
+        //let func = self.words[pos].func;
+        let word = self.words[pos].clone();
+        let func = word.func;
+        //let defines = &self.words[pos].defines.clone();
         println!("ForthWord: {:?}", self.words[pos]);
 
-        func(self, defines);
+        func(self, &word);
     }
     fn call_by_name(&'a mut self, name: &str) {
         let pos = self.find(name);
