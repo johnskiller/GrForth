@@ -13,15 +13,17 @@ fn test() {
     println!("{:?}", core);
     let s = "3 2 * . : 3x 3 * ; 4 3x . cr";
     let input = s.to_string();
-    core.interpret(input);
+    core.interpret();
     //println!("{:?}", core);
 
+    /*
     loop {
         print!("Ok. ");
         let line = readline();
         core.interpret(line);
     }
-    println!("{:?}", core);
+    */
+    //println!("{:?}", core);
 }
 
 fn readline() -> String {

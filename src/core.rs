@@ -1,6 +1,9 @@
 use crate::primv::Primv;
 use crate::stack::Stack;
+use core::iter::Map;
 use std::fmt;
+use std::io::BufRead;
+use std::str::SplitWhitespace;
 
 pub type Defines = Vec<usize>;
 const LITERAL: usize = 9999;
@@ -26,7 +29,6 @@ impl<'a> fmt::Display for ForthWord<'a> {
 
 impl<'a> fmt::Debug for ForthWord<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-
         write!(
             f,
             "{:<8} {:?} {:?} immediate?{}",
@@ -41,13 +43,15 @@ enum CoreState {
     CustomInit,
     Custom,
 }
+
 #[derive(Debug)]
 pub struct ForthCore<'a> {
     stack: Stack,
     words: Vec<ForthWord<'a>>,
     state: CoreState,
     return_stack: Vec<usize>,
-    input: Option<std::str::SplitWhitespace<'a>>,
+    //input: Option<SplitWhitespace<'a>>,
+    text: Vec<String>,
 }
 #[derive(Clone, Copy, Debug)]
 enum WordType {
@@ -95,7 +99,6 @@ impl<'a> ForthCore<'a> {
     }
     fn do_colon(&mut self, word: &ForthWord) {
         println!("do_colon");
-        
         let mut iter = word.defines.iter();
         while let Some(&d) = iter.next() {
             if d == LITERAL {
@@ -110,7 +113,7 @@ impl<'a> ForthCore<'a> {
 
     pub fn init_dict() -> Vec<ForthWord<'a>> {
         let mut dict = Vec::<ForthWord>::new();
-        let mut add_inner_word = |name: &str, func, immediate |  {
+        let mut add_inner_word = |name: &str, func, immediate| {
             let word = ForthWord {
                 name: name.to_string(),
                 func,
@@ -120,9 +123,7 @@ impl<'a> ForthCore<'a> {
             };
             //let w = Box::new(ForthWord::Inner(word));
             dict.push(word);
-            
         };
-       
         add_inner_word("swap", Self::swap, false);
         add_inner_word(".", Self::disp, false);
         add_inner_word("*", Self::mul, false);
@@ -137,7 +138,6 @@ impl<'a> ForthCore<'a> {
         add_inner_word("const", Self::define_const, false);
         add_inner_word("words", Self::do_words, false);
 
-        
         /*
         let word = ForthWord {
             name: "lit".to_string(),
@@ -157,7 +157,8 @@ impl<'a> ForthCore<'a> {
             words: dict,
             state: CoreState::Normal,
             return_stack: Vec::<usize>::new(),
-            input: None,
+     //       input: None,
+            text: vec![],
         }
     }
 
@@ -174,10 +175,10 @@ impl<'a> ForthCore<'a> {
         }
     }
 
-    fn create(&mut self ) {
+    fn create(&mut self) {
         // create  blank word
         let word = ForthWord {
-            name:"UNKNOWN".to_string(),
+            name: "UNKNOWN".to_string(),
             func: Self::do_colon,
             defines: vec![],
             wtype: WordType::Dict,
@@ -199,12 +200,14 @@ impl<'a> ForthCore<'a> {
         self.push(word.defines[0] as i32);
     }
     fn define_const(&mut self, _: &ForthWord) {
-        self.state = CoreState::CustomInit;
+        //self.state = CoreState::CustomInit;
         print!("define a const ");
         self.create();
+        let name = self.get_next();
+        self.last_word().name = name;
         self.last_word().func = Self::do_const;
         self.last_word().wtype = WordType::Const;
-        let const_value = self.pop(); 
+        let const_value = self.pop();
         self.compile_lit(const_value as usize);
     }
     fn define_word(&mut self, _: &ForthWord) {
@@ -216,7 +219,6 @@ impl<'a> ForthCore<'a> {
 
     fn do_words(&mut self, _: &ForthWord) {
         for (i, w) in self.words.iter().enumerate() {
-           
             println!("{:>4}: {:?}", i, w);
         }
     }
@@ -263,22 +265,56 @@ impl<'a> ForthCore<'a> {
     fn set_state(&mut self, state: CoreState) {
         self.state = state;
     }
-    pub fn interpret(&mut self, s: String) {
-        //let tokenizer = Tokenizer::new(s);
-        let tokenizer = s.split_whitespace();
-        //self.input = Some(tokenizer);
-        //let mut new_word = String::new();
-        //let mut w_list = Vec::<&str>::new();
+    fn readline(&mut self) -> usize {
+        //type Result<T, E = Box<dyn std::error::Error>> = std::result::Result<T, E>;
 
-        //let t = self.input.as_mut().unwrap();
-        for token in tokenizer { //} =   t.next() {
-            self.parse_word(token);
-        }
+        //let stdin = std::io::stdin();
+        //let input = stdin.lock().lines().next();
+        /*let text = input
+        .expect("No lines in buffer")
+        .expect("Failed to read line")
+        .trim()
+        .to_string();*/
 
+        //self.text = text.clone();
+        print!("Ok. ");
+        let mut input = String::new();
+        let len = std::io::stdin().read_line(&mut input);
 
+        let text = input
+            .split_whitespace()
+            .map(|s| s.to_string())
+            .rev()
+            .collect();
+        //println!("got input {:?}", text);
+        self.text = text;
+
+        return self.text.len();
+        //self.input = Some(text.split_whitespace());
+        //.to_string()
     }
 
-    fn parse_word(&mut self, token: &str ) {
+    fn get_next(&mut self) -> String {
+        loop {
+            match self.text.pop() {
+                Some(n) => return n,
+                None => {
+                    self.readline();
+                   // println!("in loop");
+                }
+            }
+        }
+    }
+    pub fn interpret(&mut self) {
+        loop {
+            let tz = self.get_next();
+
+        //    println!("got token {}", tz);
+            self.parse_word(&tz);
+        }
+    }
+
+    fn parse_word(&mut self, token: &str) {
         match self.find(token) {
             Some(pos) => {
                 match self.get_state() {
@@ -326,7 +362,7 @@ impl<'a> ForthCore<'a> {
                                 //self.compile("lit");
                                 self.compile_lit(LITERAL);
                                 self.compile_lit(n as usize);
-                                println!("compile {} literal to word",n);
+                                println!("compile {} literal to word", n);
                             }
                             Err(_) => panic!("Unknown word when define:{}", token),
                         }
