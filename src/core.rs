@@ -1,12 +1,21 @@
+use std::io::{stdout,Write};
 use crate::primv::Primv;
 use crate::stack::Stack;
-use core::iter::Map;
 use std::fmt;
-use std::io::BufRead;
-use std::str::SplitWhitespace;
+
 
 pub type Defines = Vec<usize>;
 const LITERAL: usize = 9999;
+
+macro_rules! print_flush {
+    ( $($t:tt)* ) => {
+        {
+            let mut h = stdout();
+            write!(h, $($t)* ).unwrap();
+            h.flush().unwrap();
+        }
+    }
+}
 
 #[derive(Clone)]
 pub struct ForthWord<'a> {
@@ -40,7 +49,6 @@ impl<'a> fmt::Debug for ForthWord<'a> {
 #[derive(Debug)]
 enum CoreState {
     Normal,
-    CustomInit,
     Custom,
 }
 
@@ -176,9 +184,11 @@ impl<'a> ForthCore<'a> {
     }
 
     fn create(&mut self) {
-        // create  blank word
+        // fetch name from input and create a dict entry
+        let name = self.get_next();
+
         let word = ForthWord {
-            name: "UNKNOWN".to_string(),
+            name,
             func: Self::do_colon,
             defines: vec![],
             wtype: WordType::Dict,
@@ -203,15 +213,13 @@ impl<'a> ForthCore<'a> {
         //self.state = CoreState::CustomInit;
         print!("define a const ");
         self.create();
-        let name = self.get_next();
-        self.last_word().name = name;
         self.last_word().func = Self::do_const;
         self.last_word().wtype = WordType::Const;
         let const_value = self.pop();
         self.compile_lit(const_value as usize);
     }
     fn define_word(&mut self, _: &ForthWord) {
-        self.state = CoreState::CustomInit;
+        self.state = CoreState::Custom;
         print!("define a new word ");
         self.create();
         self.last_word().func = Self::do_colon;
@@ -278,6 +286,7 @@ impl<'a> ForthCore<'a> {
 
         //self.text = text.clone();
         print!("Ok. ");
+        stdout().flush();
         let mut input = String::new();
         let len = std::io::stdin().read_line(&mut input);
 
@@ -319,11 +328,7 @@ impl<'a> ForthCore<'a> {
             Some(pos) => {
                 match self.get_state() {
                     CoreState::Normal => self.call_by_pos(pos),
-                    CoreState::CustomInit => {
-                        println!("{} redefined", token);
-                        let new_word = String::from(token); // duplicate word, redefine
-                        self.last_word().name = new_word;
-                    }
+
                     CoreState::Custom => {
                         let immediate = self.words[pos].immediate;
                         if immediate {
@@ -338,14 +343,6 @@ impl<'a> ForthCore<'a> {
             None => {
                 // not found
                 match self.state {
-                    CoreState::CustomInit => {
-                        println!("{} define ", token);
-                        let new_word = String::from(token);
-                        //self.add_udw(new_word.clone(), Vec::<&str>::new());
-                        self.last_word().name = new_word;
-                        self.state = CoreState::Custom;
-                    }
-
                     CoreState::Normal => match token.parse::<i32>() {
                         Ok(n) => {
                             println!("{} pushed", n);
