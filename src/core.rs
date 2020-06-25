@@ -1,7 +1,8 @@
+use crate::dictionary::Dictionary;
+use crate::word::ForthWord;
 use std::io::{stdout,Write};
 use crate::primv::Primv;
 use crate::stack::Stack;
-use std::fmt;
 
 
 pub type Defines = Vec<usize>;
@@ -17,34 +18,9 @@ macro_rules! print_flush {
     }
 }
 
-#[derive(Clone)]
-pub struct ForthWord<'a> {
-    name: String,
-    func: fn(&mut ForthCore<'a>, defines: &ForthWord),
-    defines: Defines,
-    wtype: WordType,
-    immediate: bool,
-}
 
-impl<'a> fmt::Display for ForthWord<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-        write!(
-            f,
-            ":{:<8} defines:{:?} {:?} immediate?{}",
-            self.name, self.defines, self.wtype, self.immediate
-        )
-    }
-}
 
-impl<'a> fmt::Debug for ForthWord<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{:<8} {:?} {:?} immediate?{}",
-            self.name, self.wtype, self.defines, self.immediate
-        )
-    }
-}
+
 
 #[derive(Debug)]
 enum CoreState {
@@ -55,14 +31,14 @@ enum CoreState {
 #[derive(Debug)]
 pub struct ForthCore<'a> {
     stack: Stack,
-    words: Vec<ForthWord<'a>>,
+    words: Dictionary<'a>,
     state: CoreState,
     return_stack: Vec<usize>,
     //input: Option<SplitWhitespace<'a>>,
     text: Vec<String>,
 }
 #[derive(Clone, Copy, Debug)]
-enum WordType {
+pub enum WordType {
     Internal,
     Dict,
     Lit,
@@ -75,7 +51,7 @@ impl<'a> ForthCore<'a> {
     pub fn add_udw(&mut self, name: String, def: Vec<&str>) {
         let mut defines = Vec::<usize>::new();
         for n in def {
-            let w = self.find(n).unwrap();
+            let w = self.words.find(n).unwrap();
             defines.push(w);
         }
         //let name = String::from(name);
@@ -86,7 +62,7 @@ impl<'a> ForthCore<'a> {
             wtype: WordType::Dict,
             immediate: false,
         };
-        self.words.push(udw);
+        self.words.add(udw);
     }
     /*
     fn do_lit(&mut self, _: usize) {
@@ -164,7 +140,7 @@ impl<'a> ForthCore<'a> {
         ForthCore {
             stack: Stack::new(),
             //v: Vec::new(),
-            words: dict,
+            words: Dictionary::new(dict),
             state: CoreState::Normal,
             return_stack: Vec::<usize>::new(),
      //       input: None,
@@ -172,18 +148,7 @@ impl<'a> ForthCore<'a> {
         }
     }
 
-    fn find(&self, name: &str) -> Option<usize> {
-        let word = self
-            .words
-            .iter()
-            .rev()
-            .position(|x| x.name.eq_ignore_ascii_case(name));
 
-        match word {
-            Some(w) => Some(self.words.len() - w - 1),
-            None => None,
-        }
-    }
 
     fn create(&mut self) {
         // fetch name from input and create a dict entry
@@ -196,16 +161,13 @@ impl<'a> ForthCore<'a> {
             wtype: WordType::Dict,
             immediate: false,
         };
-        self.words.push(word);
+        self.words.add(word);
     }
 
-    fn last_word(&mut self) -> &mut ForthWord<'a> {
-        let len = self.words.len();
-        &mut self.words[len - 1]
-    }
+
 
     fn immediate(&mut self) {
-        self.last_word().immediate = true;
+        self.words.last_word().immediate = true;
     }
 
     fn do_const(&mut self, word: &ForthWord) {
@@ -215,8 +177,8 @@ impl<'a> ForthCore<'a> {
         //self.state = CoreState::CustomInit;
         print!("define a const ");
         self.create();
-        self.last_word().func = Self::do_const;
-        self.last_word().wtype = WordType::Const;
+        self.words.last_word().func = Self::do_const;
+        self.words.last_word().wtype = WordType::Const;
         let const_value = self.pop();
         self.compile_lit(const_value as usize);
     }
@@ -224,13 +186,11 @@ impl<'a> ForthCore<'a> {
         self.state = CoreState::Custom;
         print!("define a new word ");
         self.create();
-        self.last_word().func = Self::do_colon;
+        self.words.last_word().func = Self::do_colon;
     }
 
     fn do_words(&mut self, _: &ForthWord) {
-        for (i, w) in self.words.iter().enumerate() {
-            println!("{:>4}: {:?}", i, w);
-        }
+        self.words.list_words();
     }
 
     fn end_of_define(&mut self, _: &ForthWord) {
@@ -249,15 +209,15 @@ impl<'a> ForthCore<'a> {
         //let _len = self.words.len();
         //println!("len: {}, pos: {}", _len, pos);
         //let func = self.words[pos].func;
-        let word = self.words[pos].clone();
+        let word = self.words.get_by_pos(pos).clone();
         let func = word.func;
         //let defines = &self.words[pos].defines.clone();
-        println!("ForthWord: {:?}", self.words[pos]);
+        println!("ForthWord: {:?}", word);
 
         func(self, &word);
     }
     fn call_by_name(&'a mut self, name: &str) {
-        let pos = self.find(name);
+        let pos = self.words.find(name);
 
         match pos {
             Some(w) => {
@@ -326,13 +286,13 @@ impl<'a> ForthCore<'a> {
     }
 
     fn parse_word(&mut self, token: &str) {
-        match self.find(token) {
+        match self.words.find(token) {
             Some(pos) => {
                 match self.get_state() {
                     CoreState::Normal => self.call_by_pos(pos),
 
                     CoreState::Custom => {
-                        let immediate = self.words[pos].immediate;
+                        let immediate = self.words.get_by_pos(pos).immediate;
                         if immediate {
                             println!("exec immediate word {}", token);
                             self.call_by_pos(pos);
@@ -372,11 +332,11 @@ impl<'a> ForthCore<'a> {
     }
     fn compile(&mut self, token: &str) {
         println!("compile {} into last word", token);
-        let pos = self.find(token).unwrap();
+        let pos = self.words.find(token).unwrap();
         self.compile_lit(pos);
     }
     fn compile_lit(&mut self, val: usize) {
-        self.last_word().defines.push(val);
+        self.words.last_word().defines.push(val);
     }
 
     pub fn push(&mut self, d: i32) {

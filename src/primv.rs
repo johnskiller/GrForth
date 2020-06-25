@@ -1,4 +1,4 @@
-use crate::core::ForthWord;
+use crate::word::ForthWord;
 use crate::core::ForthCore;
 
 pub trait Primv {

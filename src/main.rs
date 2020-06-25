@@ -4,6 +4,8 @@ use std::io::prelude::*;
 mod core;
 mod stack;
 mod primv;
+mod dictionary;
+mod word;
 
 fn test() {
     println!("Hello, world!");
