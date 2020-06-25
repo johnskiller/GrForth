@@ -5,6 +5,7 @@ pub trait Primv {
     fn dup(&mut self, _: &ForthWord);
     fn swap(&mut self, _: &ForthWord);
     fn mul(&mut self, _: &ForthWord);
+    fn eq(&mut self, _: &ForthWord);
     fn disp(&mut self, _: &ForthWord);
     fn emit(&mut self, _: &ForthWord);
     fn cr(&mut self, defines: &ForthWord);
@@ -33,6 +34,15 @@ impl Primv for ForthCore<'_> {
         let x = self.pop();
         let y = self.pop();
         self.push(x * y);
+    }
+    fn eq(&mut self, _: &ForthWord) {
+        let x = self.pop();
+        let y = self.pop();
+        if x == y {
+            self.push(1);
+        } else {
+            self.push(0);
+        }
     }
     fn disp(&mut self, _: &ForthWord) {
         let x = self.pop();

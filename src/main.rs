@@ -7,7 +7,7 @@ mod primv;
 
 fn test() {
     println!("Hello, world!");
-    let mut core = ForthCore::new(ForthCore::init_dict());
+    let mut core = ForthCore::new();
     //core.init();
     core.add_udw("**".to_string(), vec!["dup", "*"]);
     println!("{:?}", core);

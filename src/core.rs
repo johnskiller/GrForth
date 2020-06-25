@@ -119,7 +119,7 @@ impl<'a> ForthCore<'a> {
         }
     }
 
-    pub fn init_dict() -> Vec<ForthWord<'a>> {
+    fn init_dict() -> Vec<ForthWord<'a>> {
         let mut dict = Vec::<ForthWord>::new();
         let mut add_inner_word = |name: &str, func, immediate| {
             let word = ForthWord {
@@ -137,6 +137,7 @@ impl<'a> ForthCore<'a> {
         add_inner_word("*", Self::mul, false);
         add_inner_word("dup", Self::dup, false);
         add_inner_word("exit", Self::do_exit, false);
+        add_inner_word("=", Self::eq, false);
         //self.add_udw("**", vec!["dup", "*"]);
 
         add_inner_word(":", Self::define_word, false);
@@ -158,7 +159,8 @@ impl<'a> ForthCore<'a> {
         */
         dict
     }
-    pub fn new(dict: Vec<ForthWord<'a>>) -> ForthCore<'a> {
+    pub fn new() -> ForthCore<'a> {
+        let dict = Self::init_dict();
         ForthCore {
             stack: Stack::new(),
             //v: Vec::new(),

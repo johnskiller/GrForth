@@ -1,5 +1,5 @@
 [package]
-name = "hello_cargo"
+name = "GraForth"
 version = "0.1.0"
 authors = ["John Skiller <john@skykiller.com>"]
 edition = "2018"
