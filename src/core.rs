@@ -108,13 +108,15 @@ impl<'a> ForthCore<'a> {
     fn do_colon(&mut self, word: &ForthWord) {
         println!("do_colon");
         let mut iter = word.defines.iter();
-        while let Some(&d) = iter.next() {
-            if d == LITERAL {
+        //while let Some(&d) = iter.next() {
+        for i in (0..word.defines.len()) {
+            let item = word.defines[i];
+            if item == LITERAL {
                 // LIT
-                let lit = iter.next().unwrap();
-                self.push(*lit as i32);
+                let lit = word.defines[i+1];
+                self.push(lit as i32);
             } else {
-                self.call_by_pos(d);
+                self.call_by_pos(item);
             }
         }
     }
