@@ -1,12 +1,14 @@
 use crate::dictionary::Dictionary;
-use crate::word::ForthWord;
-use std::io::{stdout,Write};
 use crate::primv::Primv;
 use crate::stack::Stack;
-
+use crate::word::{ForthWord, WordType};
+use std::io::{stdout, Write};
+use log::{info, trace, warn};
 
 pub type Defines = Vec<usize>;
 const LITERAL: usize = 9999;
+const IF: usize = 9998;
+
 
 macro_rules! print_flush {
     ( $($t:tt)* ) => {
@@ -18,12 +20,8 @@ macro_rules! print_flush {
     }
 }
 
-
-
-
-
 #[derive(Debug)]
-enum CoreState {
+pub enum CoreState {
     Normal,
     Custom,
 }
@@ -36,15 +34,7 @@ pub struct ForthCore<'a> {
     return_stack: Vec<usize>,
     //input: Option<SplitWhitespace<'a>>,
     text: Vec<String>,
-}
-#[derive(Clone, Copy, Debug)]
-pub enum WordType {
-    Internal,
-    Dict,
-    Lit,
-    Imed, //immediate
-    Const,
-    Var,
+    IP: usize,
 }
 
 impl<'a> ForthCore<'a> {
@@ -66,34 +56,16 @@ impl<'a> ForthCore<'a> {
     }
     /*
     fn do_lit(&mut self, _: usize) {
-        println!("DOLIT {:?}", self);
+        trace!("DOLIT {:?}", self);
         // how to get next word from defines that use lit?
         let caller_pos = self.param.last().unwrap();
         let caller = &self.words[*caller_pos];
-        println!("Caller: {:?}", caller);
+        trace!("Caller: {:?}", caller);
         let caller_defs = &caller.defines;
         let n = caller_defs[0];
         self.push(n as i32);
-        println!("push {} to data stack", n);
+        trace!("push {} to data stack", n);
     } */
-
-    fn do_exit(&mut self, _: &ForthWord) {
-        // pop from param stack
-        //self.param.pop().unwrap();
-    }
-    fn do_colon(&mut self, word: &ForthWord) {
-        println!("do_colon");
-        let mut iter = word.defines.iter();
-        while let Some(&d) = iter.next() {
-            if d == LITERAL {
-                // LIT
-                let lit = iter.next().unwrap();
-                self.push(*lit as i32);
-            } else {
-                self.call_by_pos(d);
-            }
-        }
-    }
 
     fn init_dict() -> Vec<ForthWord<'a>> {
         let mut dict = Vec::<ForthWord>::new();
@@ -122,6 +94,12 @@ impl<'a> ForthCore<'a> {
         add_inner_word("cr", Primv::cr, false);
         add_inner_word("const", Self::define_const, false);
         add_inner_word("words", Self::do_words, false);
+        add_inner_word("core", Self::do_core, false);
+        add_inner_word(">R", Self::do_toR, false);
+        add_inner_word("R@", Self::do_fromR, false);
+
+        add_inner_word("if", Self::do_if, true);
+        add_inner_word("then", Self::do_then, true);
 
         /*
         let word = ForthWord {
@@ -143,16 +121,15 @@ impl<'a> ForthCore<'a> {
             words: Dictionary::new(dict),
             state: CoreState::Normal,
             return_stack: Vec::<usize>::new(),
-     //       input: None,
+            //       input: None,
             text: vec![],
+            IP: 99999,
         }
     }
 
-
-
     fn create(&mut self) {
         // fetch name from input and create a dict entry
-        let name = self.get_next();
+        let name = self.get_next_token();
 
         let word = ForthWord {
             name,
@@ -164,55 +141,22 @@ impl<'a> ForthCore<'a> {
         self.words.add(word);
     }
 
-
-
-    fn immediate(&mut self) {
-        self.words.last_word().immediate = true;
-    }
-
-    fn do_const(&mut self, word: &ForthWord) {
-        self.push(word.defines[0] as i32);
-    }
-    fn define_const(&mut self, _: &ForthWord) {
-        //self.state = CoreState::CustomInit;
-        print!("define a const ");
-        self.create();
-        self.words.last_word().func = Self::do_const;
-        self.words.last_word().wtype = WordType::Const;
-        let const_value = self.pop();
-        self.compile_lit(const_value as usize);
-    }
-    fn define_word(&mut self, _: &ForthWord) {
-        self.state = CoreState::Custom;
-        print!("define a new word ");
-        self.create();
-        self.words.last_word().func = Self::do_colon;
-    }
-
-    fn do_words(&mut self, _: &ForthWord) {
-        self.words.list_words();
-    }
-
-    fn end_of_define(&mut self, _: &ForthWord) {
-        self.state = CoreState::Normal;
-        self.compile("exit");
-    }
     /*
     fn exec(core: &mut ForthCore, w:&UserDefinedWord) {
         let defs = w.defines.clone();
                 for d in defs {
-                    //println!("find at pos:{}", d);
+                    //trace!("find at pos:{}", d);
                     core.call_by_pos(d);
                 }
     }*/
     fn call_by_pos(&mut self, pos: usize) {
         //let _len = self.words.len();
-        //println!("len: {}, pos: {}", _len, pos);
+        //trace!("len: {}, pos: {}", _len, pos);
         //let func = self.words[pos].func;
         let word = self.words.get_by_pos(pos).clone();
         let func = word.func;
         //let defines = &self.words[pos].defines.clone();
-        println!("ForthWord: {:?}", word);
+        trace!("ForthWord: {:?}", word);
 
         func(self, &word);
     }
@@ -224,7 +168,7 @@ impl<'a> ForthCore<'a> {
                 self.call_by_pos(w);
             }
 
-            None => println!("[{}] word not found", name),
+            None => trace!("[{}] word not found", name),
         }
     }
 
@@ -257,7 +201,7 @@ impl<'a> ForthCore<'a> {
             .map(|s| s.to_string())
             .rev()
             .collect();
-        //println!("got input {:?}", text);
+        //trace!("got input {:?}", text);
         self.text = text;
 
         return self.text.len();
@@ -265,63 +209,61 @@ impl<'a> ForthCore<'a> {
         //.to_string()
     }
 
-    fn get_next(&mut self) -> String {
+    fn get_next_token(&mut self) -> String {
         loop {
             match self.text.pop() {
                 Some(n) => return n,
                 None => {
                     self.readline();
-                   // println!("in loop");
+                    // trace!("in loop");
                 }
             }
         }
     }
     pub fn interpret(&mut self) {
         loop {
-            let tz = self.get_next();
+            let tz = self.get_next_token();
 
-        //    println!("got token {}", tz);
+            //    trace!("got token {}", tz);
             self.parse_word(&tz);
         }
     }
 
     fn parse_word(&mut self, token: &str) {
         match self.words.find(token) {
-            Some(pos) => {
-                match self.get_state() {
-                    CoreState::Normal => self.call_by_pos(pos),
+            Some(pos) => match self.get_state() {
+                CoreState::Normal => self.call_by_pos(pos),
 
-                    CoreState::Custom => {
-                        let immediate = self.words.get_by_pos(pos).immediate;
-                        if immediate {
-                            println!("exec immediate word {}", token);
-                            self.call_by_pos(pos);
-                        } else {
-                            self.compile(token);
-                        }
+                CoreState::Custom => {
+                    let immediate = self.words.get_by_pos(pos).immediate;
+                    if immediate {
+                        trace!("exec immediate word {}", token);
+                        self.call_by_pos(pos);
+                    } else {
+                        self.compile(token);
                     }
                 }
-            }
+            },
             None => {
                 // not found
                 match self.state {
                     CoreState::Normal => match token.parse::<i32>() {
                         Ok(n) => {
-                            println!("{} pushed", n);
+                            trace!("{} pushed", n);
                             self.stack.push(n)
                         }
-                        Err(_) => println!("Unknown word: {}", token),
+                        Err(_) => trace!("Unknown word: {}", token),
                     },
                     CoreState::Custom => {
                         match token.parse::<i32>() {
                             Ok(n) => {
-                                //println!("push Lit {} to param stack",n);
+                                //trace!("push Lit {} to param stack",n);
                                 //self.param.push(n);
 
                                 //self.compile("lit");
                                 self.compile_lit(LITERAL);
                                 self.compile_lit(n as usize);
-                                println!("compile {} literal to word", n);
+                                trace!("compile {} literal to word", n);
                             }
                             Err(_) => panic!("Unknown word when define:{}", token),
                         }
@@ -331,7 +273,7 @@ impl<'a> ForthCore<'a> {
         }
     }
     fn compile(&mut self, token: &str) {
-        println!("compile {} into last word", token);
+        trace!("compile {} into last word", token);
         let pos = self.words.find(token).unwrap();
         self.compile_lit(pos);
     }
@@ -345,5 +287,121 @@ impl<'a> ForthCore<'a> {
 
     pub fn pop(&mut self) -> i32 {
         self.stack.pop()
+    }
+
+    fn do_if(&mut self, _: &ForthWord) {
+        self.compile_lit(IF);
+        let pholder = self.words.last_word().defines.len();
+        self.compile_lit(0); // place holder
+        trace!("place holder of if {}",pholder);
+        self.push(pholder as i32); // push place holder addr
+    }
+
+    fn do_then(&mut self, _: &ForthWord) {
+        let pholder = self.pop() as usize;
+        let word = self.words.last_word();
+        let then_pos = word.defines.len();
+        trace!("then pos {}",then_pos);
+        word.defines[pholder] = then_pos;
+    }
+}
+
+trait Vocabulary {
+    fn do_const(&mut self, word: &ForthWord);
+    fn define_const(&mut self, _: &ForthWord);
+    fn define_word(&mut self, _: &ForthWord);
+    fn do_words(&mut self, _: &ForthWord);
+    fn do_core(&mut self, _: &ForthWord);
+    fn end_of_define(&mut self, _: &ForthWord);
+    fn do_create(&mut self, _: &ForthWord);
+    fn do_immediate(&mut self, _: &ForthWord);
+    fn do_colon(&mut self, word: &ForthWord);
+    fn do_exit(&mut self, _: &ForthWord);
+    fn do_toR(&mut self, _: &ForthWord);
+    fn do_fromR(&mut self, _: &ForthWord);
+}
+
+impl Vocabulary for ForthCore<'_> {
+    fn define_const(&mut self, _: &ForthWord) {
+        //self.state = CoreState::CustomInit;
+        print!("define a const ");
+        self.create();
+        self.words.last_word().func = Self::do_const;
+        self.words.last_word().wtype = WordType::Const;
+        let const_value = self.pop();
+        self.compile_lit(const_value as usize);
+    }
+    fn define_word(&mut self, _: &ForthWord) {
+        self.state = CoreState::Custom;
+        print!("define a new word ");
+        self.create();
+        self.words.last_word().func = Self::do_colon;
+    }
+
+    fn do_words(&mut self, _: &ForthWord) {
+        self.words.list_words();
+    }
+    fn do_core(&mut self, _: &ForthWord) {
+        trace!("{:?}", self);
+    }
+    fn do_toR(&mut self, _: &ForthWord) {
+        let v = self.pop() as usize;
+        self.return_stack.push(v);
+    }
+
+    fn do_fromR(&mut self, _: &ForthWord) {
+        let v = self.return_stack.pop().unwrap() as i32;
+        self.push(v);
+    }
+    fn end_of_define(&mut self, _: &ForthWord) {
+        self.state = CoreState::Normal;
+        self.compile("exit");
+    }
+
+    fn do_immediate(&mut self, _: &ForthWord) {
+        self.words.last_word().immediate = true;
+    }
+
+    fn do_create(&mut self, _: &ForthWord) {
+        self.create();
+    }
+    fn do_exit(&mut self, _: &ForthWord) {
+        // pop from param stack
+        //self.param.pop().unwrap();
+    }
+
+    // runtime of const
+    fn do_const(&mut self, word: &ForthWord) {
+        self.push(word.defines[0] as i32);
+    }
+
+    // runtime of colon defination
+    fn do_colon(&mut self, word: &ForthWord) {
+        trace!("do_colon");
+        //let mut iter = word.defines.iter();
+        //        while let Some(&d) = iter.next() {
+        self.IP = 0;
+        while self.IP < word.defines.len() {
+            let i = self.IP;
+            self.IP = i + 1;
+            let item = word.defines[i];
+            if item == LITERAL {
+                // LIT
+                let lit = word.defines[self.IP];
+                self.push(lit as i32);
+                self.IP = self.IP + 1;
+            } else if item == IF {
+                if self.pop() == 0 {
+                    // jump to THEN
+                    let then_pos = word.defines[self.IP];
+                    trace!("will jump to {}",then_pos);
+                    self.IP = then_pos;
+                } else {
+                    self.IP = self.IP + 1;
+                }
+            } else {
+                self.call_by_pos(item);
+            }
+        }
     }
 }

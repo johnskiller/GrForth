@@ -1,7 +1,17 @@
 use crate::core::Defines;
-use crate::core::WordType;
 use crate::core::ForthCore;
 use std::fmt;
+
+
+#[derive(Clone, Copy, Debug)]
+pub enum WordType {
+    Internal,
+    Dict,
+    Lit,
+    Imed, //immediate
+    Const,
+    Var,
+}
 
 #[derive(Clone)]
 pub struct ForthWord<'a> {

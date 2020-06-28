@@ -1,3 +1,7 @@
+#[macro_use]
+extern crate log;
+extern crate simple_logger;
+
 use crate::core::ForthCore;
 use std::io::prelude::*;
 
@@ -41,5 +45,6 @@ fn readline() -> String {
 }
 
 fn main() {
+    simple_logger::init().unwrap();
     test()
 }
