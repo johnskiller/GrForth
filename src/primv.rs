@@ -46,12 +46,12 @@ impl Primv for ForthCore<'_> {
     }
     fn disp(&mut self, _: &ForthWord) {
         let x = self.pop();
-        print!("{:?} ", x);
+        print!("{} ", x);
     }
 
     fn emit(&mut self, _: &ForthWord) {
         let x = self.pop() as u8 as char;
-        print!("emit:{}", x);
+        print!("{}", x);
     }
 
     fn eval(&mut self, _: &ForthWord) {
