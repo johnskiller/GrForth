@@ -2,13 +2,13 @@ use crate::dictionary::Dictionary;
 use crate::primv::Primv;
 use crate::stack::Stack;
 use crate::word::{ForthWord, WordType};
-use std::io::{stdout, Write};
 use log::{info, trace, warn};
+use std::io::{stdout, Write};
 
 pub type Defines = Vec<usize>;
 const LITERAL: usize = 9999;
 const IF: usize = 9998;
-
+const JMP: usize = 9997;
 
 macro_rules! print_flush {
     ( $($t:tt)* ) => {
@@ -100,6 +100,8 @@ impl<'a> ForthCore<'a> {
 
         add_inner_word("if", Self::do_if, true);
         add_inner_word("then", Self::do_then, true);
+        add_inner_word("endif", Self::do_then, true);
+        add_inner_word("else", Self::do_else, true);
 
         /*
         let word = ForthWord {
@@ -293,15 +295,31 @@ impl<'a> ForthCore<'a> {
         self.compile_lit(IF);
         let pholder = self.words.last_word().defines.len();
         self.compile_lit(0); // place holder
-        trace!("place holder of if {}",pholder);
+        trace!("place holder of if {}", pholder);
         self.push(pholder as i32); // push place holder addr
     }
-
-    fn do_then(&mut self, _: &ForthWord) {
+    fn do_else(&mut self, _: &ForthWord) {
+        //  at and of IF, jump to THEN
+        self.compile_lit(JMP);
+        let pholder_else = self.words.last_word().defines.len();
+        self.compile_lit(0); // place holder, will be filled by THEN
+        trace!("place holder of else {}", pholder_else);
+        
+        // fill place holder of if
         let pholder = self.pop() as usize;
         let word = self.words.last_word();
+        let else_pos = word.defines.len();
+        trace!("then pos {}", else_pos); // put then pos/ or else pos
+        word.defines[pholder] = else_pos;
+
+        self.push(pholder_else as i32); // push place holder addr
+    }
+    fn do_then(&mut self, _: &ForthWord) {
+        let pholder = self.pop() as usize;
+        // no else
+        let word = self.words.last_word();
         let then_pos = word.defines.len();
-        trace!("then pos {}",then_pos);
+        trace!("then pos {}", then_pos); // put then pos/ or else pos
         word.defines[pholder] = then_pos;
     }
 }
@@ -392,13 +410,17 @@ impl Vocabulary for ForthCore<'_> {
                 self.IP = self.IP + 1;
             } else if item == IF {
                 if self.pop() == 0 {
-                    // jump to THEN
+                    // jump to ELSE/THEN
                     let then_pos = word.defines[self.IP];
-                    trace!("will jump to {}",then_pos);
+                    trace!("will jump to {}", then_pos);
                     self.IP = then_pos;
                 } else {
                     self.IP = self.IP + 1;
                 }
+            } else if item == JMP {
+                    let then_pos = word.defines[self.IP];
+                    trace!("will jump to {}", then_pos);
+                    self.IP = then_pos;
             } else {
                 self.call_by_pos(item);
             }
