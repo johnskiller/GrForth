@@ -162,6 +162,7 @@ impl<'a> ForthCore<'a> {
 
         func(self, &word);
     }
+    /*
     fn call_by_name(&'a mut self, name: &str) {
         let pos = self.words.find(name);
 
@@ -173,7 +174,8 @@ impl<'a> ForthCore<'a> {
             None => trace!("[{}] word not found", name),
         }
     }
-
+    */
+    
     fn get_state(&self) -> &CoreState {
         &self.state
     }

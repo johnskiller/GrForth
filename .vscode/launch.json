@@ -8,15 +8,15 @@
                 {
                         "type": "lldb",
                         "request": "launch",
-                        "name": "Debug executable 'GraForth'",
+                        "name": "Debug executable 'GrForth'",
                         "cargo": {
                                 "args": [
                                         "build",
-                                        "--bin=GraForth",
-                                        "--package=GraForth"
+                                        "--bin=GrForth",
+                                        "--package=GrForth"
                                 ],
                                 "filter": {
-                                        "name": "GraForth",
+                                        "name": "GrForth",
                                         "kind": "bin"
                                 }
                         },
@@ -35,16 +35,16 @@
                 {
                         "type": "lldb",
                         "request": "launch",
-                        "name": "Debug unit tests in executable 'hello_cargo'",
+                        "name": "Debug unit tests in executable 'GrForth'",
                         "cargo": {
                                 "args": [
                                         "test",
                                         "--no-run",
-                                        "--bin=hello_cargo",
-                                        "--package=hello_cargo"
+                                        "--bin=GrForth",
+                                        "--package=GrForth"
                                 ],
                                 "filter": {
-                                        "name": "hello_cargo",
+                                        "name": "GrForth",
                                         "kind": "bin"
                                 }
                         },
