@@ -175,7 +175,7 @@ impl<'a> ForthCore<'a> {
         }
     }
     */
-    
+
     fn get_state(&self) -> &CoreState {
         &self.state
     }
@@ -256,7 +256,7 @@ impl<'a> ForthCore<'a> {
                             trace!("{} pushed", n);
                             self.stack.push(n)
                         }
-                        Err(_) => trace!("Unknown word: {}", token),
+                        Err(_) => println!("Unknown word: {}", token),
                     },
                     CoreState::Custom => {
                         match token.parse::<i32>() {
@@ -362,7 +362,7 @@ impl Vocabulary for ForthCore<'_> {
         self.words.list_words();
     }
     fn do_core(&mut self, _: &ForthWord) {
-        trace!("{:?}", self);
+        println!("{:?}", self);
     }
     fn do_toR(&mut self, _: &ForthWord) {
         let v = self.pop() as usize;

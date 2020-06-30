@@ -14,7 +14,7 @@ pub trait Primv {
 
 impl Primv for ForthCore<'_> {
     fn cr(&mut self, defines: &ForthWord) {
-        self.push('\r' as i32);
+        self.push('\n' as i32);
         self.emit(defines);
     }
 
