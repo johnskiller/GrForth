@@ -1,10 +1,10 @@
-#[macro_use]
 extern crate log;
 extern crate simple_logger;
 
 use crate::core::ForthCore;
 use crate::dictionary::OpCode;
 use std::io::prelude::*;
+use std::io::{stdout, Write};
 
 mod core;
 mod stack;
@@ -20,16 +20,15 @@ fn test() {
     println!("{:?}", core);
     let s = "3 2 * . : 3x 3 * ; 4 3x . cr";
     let input = s.to_string();
-    core.interpret();
+    core.interpret2(s);
     //println!("{:?}", core);
 
-    /*
     loop {
         print!("Ok. ");
+        stdout().flush();
         let line = readline();
-        core.interpret(line);
+        core.interpret2(line.as_ref());
     }
-    */
     //println!("{:?}", core);
 }
 
@@ -43,6 +42,7 @@ fn readline() -> String {
         .expect("Failed to read line")
         .trim()
         .to_string()
+
 }
 
 fn main() {

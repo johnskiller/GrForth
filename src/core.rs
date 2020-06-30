@@ -224,6 +224,25 @@ impl<'a> ForthCore<'a> {
             }
         }
     }
+
+    pub fn interpret2(&mut self, input: &str) {
+        let text = input
+            .split_whitespace()
+            .map(|s| s.to_string())
+            .rev()
+            .collect();
+        //trace!("got input {:?}", text);
+        self.text = text;
+        loop {
+            match self.text.pop() {
+                Some(n) => self.parse_word(n.as_ref()),
+                None => {
+                    return;
+                    // trace!("in loop");
+                }
+            }
+        }
+    }
     pub fn interpret(&mut self) {
         loop {
             let tz = self.get_next_token();
