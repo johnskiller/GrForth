@@ -1,13 +1,34 @@
 use crate::word::ForthWord;
+use std::collections::HashMap;
+
+struct Foo {
+}
+
+#[derive(Debug)]
+pub enum OpCode {
+    ADD,
+    MINUS,
+    MUL,
+    DIV,
+    MOD,
+    DUP,
+    SWAP,
+    ROT,
+    OVER,
+
+}
 #[derive(Debug)]
 pub struct Dictionary<'a> {
     words: Vec<ForthWord<'a>>,
+    index: HashMap<OpCode, usize>,
+
 }
 
 impl<'a> Dictionary<'a> {
     pub fn new(dict: Vec<ForthWord<'a>>) -> Self {
         Dictionary {
             words: dict,
+            index: HashMap::new(),
         }
     }
     pub fn get_by_pos(&self, pos: usize) -> &ForthWord<'a> {

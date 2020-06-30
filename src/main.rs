@@ -3,6 +3,7 @@ extern crate log;
 extern crate simple_logger;
 
 use crate::core::ForthCore;
+use crate::dictionary::OpCode;
 use std::io::prelude::*;
 
 mod core;
@@ -45,6 +46,7 @@ fn readline() -> String {
 }
 
 fn main() {
+    println!("Opcode {:?}, as usize {}",OpCode::MUL, OpCode::MUL as usize);
     simple_logger::init().unwrap();
     test()
 }
