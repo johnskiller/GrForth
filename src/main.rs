@@ -2,6 +2,7 @@ extern crate log;
 extern crate simple_logger;
 
 use crate::core::ForthCore;
+use crate::primv::Primv;
 use crate::dictionary::OpCode;
 use std::io::prelude::*;
 use std::io::{stdout, Write};
@@ -16,11 +17,12 @@ fn test() {
     println!("Hello, world!");
     let mut core = ForthCore::new();
     //core.init();
-    core.add_udw("**".to_string(), vec!["dup", "*"]);
+    //core.add_udw("**".to_string(), vec!["dup", "*"]);
     println!("{:?}", core);
-    let s = "3 2 * . : 3x 3 * ; 4 3x . cr";
+    //let s = "3 2 * . : 3x 3 * ; 4 3x . cr";
+    let s = ": 3x 3 * ; : test 6 3x ; words core";
     let input = s.to_string();
-    core.interpret2(s);
+    core.interpret2(&input);
     //println!("{:?}", core);
 
     loop {
@@ -43,6 +45,17 @@ fn readline() -> String {
         .trim()
         .to_string()
 
+}
+
+fn test2() {
+    let mut d: Vec<i32> = vec![1,2,3,4,5,6];
+
+    let pd = d.as_mut_ptr();
+    let func = ForthCore::dup;
+    unsafe {
+        *pd.offset(3) = func as i32;
+    }
+    println!("{:?}",d);
 }
 
 fn main() {
