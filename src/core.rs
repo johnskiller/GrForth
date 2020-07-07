@@ -65,7 +65,7 @@ impl<'a> ForthCore<'a> {
                 //defines: vec![],
                 wtype: WordType::Primv,
                 immediate,
-                define_ptr: 0,
+                define_ptr: 999,
             };
             //let w = Box::new(ForthWord::Inner(word));
             self.words.create_primv_word(word);
@@ -94,6 +94,8 @@ impl<'a> ForthCore<'a> {
         add_inner_word("then", Self::do_then, true);
         add_inner_word("endif", Self::do_then, true);
         add_inner_word("else", Self::do_else, true);
+        add_inner_word("_if", Self::_if, false);
+        add_inner_word("_jmp", Self::_jmp, false);
 
         /*
         let word = ForthWord {
@@ -245,7 +247,7 @@ impl<'a> ForthCore<'a> {
         match self.words.find(token) {
             Some(word) => match self.get_state() {
                 CoreState::Normal => {
-                    self.IP = word.define_ptr;
+                    self.IP = word.define_ptr + 1;
                     let func = word.func;
                     func(self);
                 },
@@ -416,13 +418,16 @@ impl Vocabulary for ForthCore<'_> {
     fn do_exit(&mut self) {
         // pop from param stack
         //self.param.pop().unwrap();
-        self.IP = self.return_stack.pop().unwrap();
+        match self.return_stack.pop() {
+            Some(n) => self.IP = n,
+            None => {},
+        }
     }
 
     // runtime of const
     fn do_const(&mut self) {
         //let word = self.words.get_by_pos(self.WP).clone();
-        self.IP = self.IP + 1;
+        //self.IP = self.IP + 1;
         let value = self.words.get_lit(self.IP) as i32;
         self.push(value);
         //self.IP = self.IP + 1;
@@ -434,9 +439,9 @@ impl Vocabulary for ForthCore<'_> {
             self.IP = self.IP + 1;
             let then_pos = self.words.get_lit(self.IP);
             trace!("will jump to {}", then_pos);
-            self.IP = then_pos as usize;
+            self.IP = (then_pos - 1 ) as usize;
         } else {
-            self.IP = self.IP + 2;
+            self.IP += 1; 
         }
     }
 
@@ -444,7 +449,7 @@ impl Vocabulary for ForthCore<'_> {
         self.IP = self.IP + 1;
         let then_pos = self.words.get_lit(self.IP);
         trace!("will jump to {}", then_pos);
-        self.IP = then_pos as usize;
+        self.IP = (then_pos - 1) as usize;
     }
 
     // runtime of colon defination
@@ -458,13 +463,24 @@ impl Vocabulary for ForthCore<'_> {
                     self.IP += 1;
                 },
                 DefineItem::Func(f) =>  {
+                    //f(self);
+                    let exit : WFunc = Self::do_exit;
+                    //let fp =  f as * const fn(WFunc) -> ();
+                    if *f as usize  == exit as usize{
+                        f(self);
+                        break;
+                    }
                     f(self);
                     self.IP += 1;
                 },
                 DefineItem::Addr(a) => {
                     println!("Defined Word at {}",a);
-                    self.return_stack.push(self.IP);
+                    self.return_stack.push(self.IP+1);
                     self.IP = *a;
+                    if let DefineItem::Func(func) = self.words.get_define(self.IP) { 
+                        self.IP +=1;
+                        func(self); 
+                        }
                 }, 
             }
         } 

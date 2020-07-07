@@ -1,4 +1,3 @@
-use std::error::Error;
 use crate::core::ForthCore;
 use crate::core::Vocabulary;
 use crate::word::{ForthWord, WordType};
@@ -53,9 +52,30 @@ pub struct Dictionary<'a> {
 
 impl<'a> fmt::Debug for Dictionary<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let itemname = | item :&DefineItem| -> &str  {
+            match item {
+                DefineItem::Lit(_) => "",
+                DefineItem::Func(f) => {
+                    let colon : WFunc = Vocabulary::do_colon;
+                    if *f as usize == colon as usize {return " : " }
+                    for v in self.index.values() {
+                        if v.func as usize == *f as usize { return &v.name }
+                    }
+                    ""
+                },
+                DefineItem::Addr(n) => {
+                    for v in self.index.values() {
+                        if v.define_ptr == *n {
+                            return &v.name
+                        }
+                    }
+                    ""
+                }
+            }
+        };
         write!(f,"\n");
         for (i,item) in self.defines.iter().enumerate() {
-            write!(f, "{:>4} {:?}\n", i,item);
+            write!(f, "{:>4} {:?} {}\n", i,item, itemname(item));
         }
         write!(f, "last:{:?}", self.last_word)
     }
@@ -155,6 +175,7 @@ impl<'a> Dictionary<'a> {
         self.last_word = Some(word.name.clone());
         self.index.insert(word.name.clone(), word);
         //self.words.add(word);
+        self.defines.push(DefineItem::Func(Vocabulary::do_colon));
     }
     pub fn create_primv_word(&mut self, word: ForthWord<'a>) {
         self.index.insert(word.name.clone(), word);
@@ -181,6 +202,9 @@ impl<'a> Dictionary<'a> {
         self.defines.push(DefineItem::Lit(val));
     }
 
+    pub fn compile_func(&mut self, f: WFunc<'a>)  {
+        self.defines.push(DefineItem::Func(f));
+    }
     pub fn get_lit(&mut self, pos: usize) -> i32 {
         match self.defines[pos] {
             DefineItem::Lit(n) => n,

@@ -20,7 +20,7 @@ fn test() {
     //core.add_udw("**".to_string(), vec!["dup", "*"]);
     println!("{:?}", core);
     //let s = "3 2 * . : 3x 3 * ; 4 3x . cr";
-    let s = ": 3x 3 * ; : test 6 3x ; words core";
+    let s = ": 3x 3 * ; : test 6 3x ; : t 0 = if 55 . else 66 . then 77 . ; words core";
     let input = s.to_string();
     core.interpret2(&input);
     //println!("{:?}", core);
