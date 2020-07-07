@@ -53,8 +53,11 @@ pub struct Dictionary<'a> {
 
 impl<'a> fmt::Debug for Dictionary<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}  last:{:?}", 
-        self.defines, self.last_word)
+        write!(f,"\n");
+        for (i,item) in self.defines.iter().enumerate() {
+            write!(f, "{:>4} {:?}\n", i,item);
+        }
+        write!(f, "last:{:?}", self.last_word)
     }
 }
 
