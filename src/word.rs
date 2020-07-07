@@ -1,14 +1,11 @@
-use crate::core::Defines;
 use crate::core::ForthCore;
 use std::fmt;
 
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WordType {
     Primv,
     Dict,
-    Lit,
-    Imed, //immediate
     Const,
     Var,
 }
@@ -35,10 +32,14 @@ impl<'a> fmt::Display for ForthWord<'a> {
 
 impl<'a> fmt::Debug for ForthWord<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let d_ptr = match self.wtype {
+            WordType::Dict => format!("Dict  d_ptr:{}",self.define_ptr),
+            _ => "Primv".to_string(),
+        };
         write!(
             f,
-            "{:<8}  d_prt:{} func:{:X} {:?} immed?{}",
-            self.name, self.define_ptr, self.func as u64, self.wtype, self.immediate
+            "{:<8}   func:{:X}  immed?{:<5} {}",
+            self.name,  self.func as u64, self.immediate,d_ptr
         )
     }
 }

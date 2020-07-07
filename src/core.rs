@@ -1,4 +1,3 @@
-use std::error::Error;
 use crate::dictionary::WFunc;
 use crate::dictionary::Dictionary;
 use crate::dictionary::DefineItem;
@@ -8,20 +7,20 @@ use crate::word::{ForthWord, WordType};
 use log::{info, trace, warn};
 use std::io::{stdout, Write};
 
-pub type Defines = Vec<usize>;
-const LITERAL: usize = 9999;
-const IF: usize = 9998;
-const JMP: usize = 9997;
+// pub type Defines = Vec<usize>;
+// const LITERAL: usize = 9999;
+// const IF: usize = 9998;
+// const JMP: usize = 9997;
 
-macro_rules! print_flush {
-    ( $($t:tt)* ) => {
-        {
-            let mut h = stdout();
-            write!(h, $($t)* ).unwrap();
-            h.flush().unwrap();
-        }
-    }
-}
+// macro_rules! print_flush {
+//     ( $($t:tt)* ) => {
+//         {
+//             let mut h = stdout();
+//             write!(h, $($t)* ).unwrap();
+//             h.flush().unwrap();
+//         }
+//     }
+// }
 
 #[derive(Debug)]
 pub enum CoreState {
@@ -73,6 +72,8 @@ impl<'a> ForthCore<'a> {
         add_inner_word("swap", Self::swap, false);
         add_inner_word(".", Self::disp, false);
         add_inner_word("*", Self::mul, false);
+        add_inner_word("/", Self::div, false);
+        add_inner_word("*/", Self::muldiv, false);
         add_inner_word("dup", Self::dup, false);
         add_inner_word("exit", Self::do_exit, false);
         add_inner_word("=", Self::eq, false);
@@ -84,11 +85,15 @@ impl<'a> ForthCore<'a> {
         add_inner_word("emit", Self::emit, false);
         add_inner_word("cr", Primv::cr, false);
         add_inner_word("const", Self::define_const, false);
+        add_inner_word("var", Self::define_var, false);
         add_inner_word("_lit", Self::do_literal, false); // runtime of const
         add_inner_word("words", Self::do_words, false);
         add_inner_word("core", Self::do_core, false);
         add_inner_word(">R", Self::do_toR, false);
         add_inner_word("R@", Self::do_fromR, false);
+
+        add_inner_word("@", Self::do_retrive, false);
+        add_inner_word("!", Self::do_store, false);
 
         add_inner_word("if", Self::do_if, true);
         add_inner_word("then", Self::do_then, true);
@@ -182,7 +187,7 @@ impl<'a> ForthCore<'a> {
         print!("Ok. ");
         stdout().flush();
         let mut input = String::new();
-        let len = std::io::stdin().read_line(&mut input);
+        let _len = std::io::stdin().read_line(&mut input);
 
         let text = input
             .split_whitespace()
@@ -355,7 +360,11 @@ impl<'a> ForthCore<'a> {
 }
 pub trait Vocabulary {
     fn do_const(&mut self);
+    fn do_var(&mut self);
+    fn do_retrive(&mut self);
+    fn do_store(&mut self);
     fn define_const(&mut self);
+    fn define_var(&mut self);
     fn define_word(&mut self);
     fn do_words(&mut self);
     fn do_core(&mut self);
@@ -379,6 +388,14 @@ impl Vocabulary for ForthCore<'_> {
         self.words.set_last_type(WordType::Const);
         let const_value = self.pop();
         self.compile_lit(const_value);
+    }
+
+    fn define_var(&mut self) {
+        trace!("define var");
+        self.push(0);
+        self.define_const();
+        self.words.set_last_func(Self::do_var); // which push var addr to stack
+        self.words.set_last_type(WordType::Var);
     }
     fn define_word(&mut self) {
         self.state = CoreState::Custom;
@@ -433,6 +450,21 @@ impl Vocabulary for ForthCore<'_> {
         //self.IP = self.IP + 1;
     }
 
+    // runtime of variable 
+    fn do_var(&mut self) {
+        self.push(self.IP as i32);
+    }
+    fn do_store(&mut self) {
+        let v_pos = self.pop() as usize;
+        let val = self.pop();
+        self.words.put_lit(v_pos, val as usize);
+    }
+
+    fn do_retrive(&mut self) {
+        let v_pos = self.pop() as usize;
+        let val = self.words.get_lit(v_pos);
+        self.push(val);
+    }
     fn _if(&mut self) {
         if self.pop() == 0 {
             // jump to ELSE/THEN
@@ -459,7 +491,7 @@ impl Vocabulary for ForthCore<'_> {
         loop {
             match self.words.get_define(self.IP) {
                 DefineItem::Lit(_) => {
-                    println!("wrong type");
+                    warn!("wrong type");
                     self.IP += 1;
                 },
                 DefineItem::Func(f) =>  {
@@ -474,7 +506,7 @@ impl Vocabulary for ForthCore<'_> {
                     self.IP += 1;
                 },
                 DefineItem::Addr(a) => {
-                    println!("Defined Word at {}",a);
+                    trace!("Defined Word at {}",a);
                     self.return_stack.push(self.IP+1);
                     self.IP = *a;
                     if let DefineItem::Func(func) = self.words.get_define(self.IP) { 

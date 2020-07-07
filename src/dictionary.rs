@@ -5,10 +5,6 @@ use crate::word::{ForthWord, WordType};
 use std::collections::HashMap;
 use std::fmt;
 
-struct MyError {
-    msg:String,
-}
-
 
 pub type WFunc<'a> = fn(&mut ForthCore<'a>) -> ();
 //pub type WFunc<'a> = fn(&mut ForthCore<'a>) -> Result<(),&'static str>;
@@ -27,7 +23,7 @@ impl<'a> fmt::Debug for DefineItem<'a> {
         }
     }
 }
-
+/*
 #[derive(Debug)]
 pub enum OpCode {
     ADD,
@@ -41,7 +37,7 @@ pub enum OpCode {
     OVER,
     DICT,
 }
-
+*/
 pub struct Dictionary<'a> {
     //words: Vec<ForthWord<'a>>,
     defines: Vec<DefineItem<'a>>,
@@ -52,12 +48,18 @@ pub struct Dictionary<'a> {
 
 impl<'a> fmt::Debug for Dictionary<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let itemname = | item :&DefineItem| -> &str  {
+        let itemname = | i,item :&DefineItem| -> &str  {
             match item {
                 DefineItem::Lit(_) => "",
                 DefineItem::Func(f) => {
                     let colon : WFunc = Vocabulary::do_colon;
-                    if *f as usize == colon as usize {return " : " }
+                    if *f as usize == colon as usize {
+                        for v in self.index.values()
+                        .filter(|v| {v.wtype == WordType::Dict}) {
+                            if v.define_ptr == i {return &v.name}
+                        }
+                        return " : " 
+                    }
                     for v in self.index.values() {
                         if v.func as usize == *f as usize { return &v.name }
                     }
@@ -75,7 +77,7 @@ impl<'a> fmt::Debug for Dictionary<'a> {
         };
         write!(f,"\n");
         for (i,item) in self.defines.iter().enumerate() {
-            write!(f, "{:>4} {:?} {}\n", i,item, itemname(item));
+            write!(f, "{:>4} {:?} {}\n", i,item, itemname(i,item));
         }
         write!(f, "last:{:?}", self.last_word)
     }
@@ -211,7 +213,6 @@ impl<'a> Dictionary<'a> {
             _ => panic!("Wrong item in defines"),
         }
     }
-    fn init(&mut self) {}
 
     pub fn tod(&self) -> usize {
         self.defines.len()
@@ -225,7 +226,7 @@ impl<'a> Dictionary<'a> {
         &self.defines[pos]
     }
 
-    pub fn get_define_len(&self) -> usize {
-        self.defines.len()
-    }
+    // pub fn get_define_len(&self) -> usize {
+    //     self.defines.len()
+    // }
 }

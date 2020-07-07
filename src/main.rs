@@ -3,7 +3,6 @@ extern crate simple_logger;
 
 use crate::core::ForthCore;
 use crate::primv::Primv;
-use crate::dictionary::OpCode;
 use std::io::prelude::*;
 use std::io::{stdout, Write};
 
@@ -59,7 +58,7 @@ fn test2() {
 }
 
 fn main() {
-    println!("Opcode {:?}, as usize {}",OpCode::MUL, OpCode::MUL as usize);
+    //println!("Opcode {:?}, as usize {}",OpCode::MUL, OpCode::MUL as usize);
     simple_logger::init().unwrap();
     test()
 }

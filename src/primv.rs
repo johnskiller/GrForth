@@ -1,10 +1,11 @@
-use crate::word::ForthWord;
 use crate::core::ForthCore;
 
 pub trait Primv {
     fn dup(&mut self);
     fn swap(&mut self);
     fn mul(&mut self);
+    fn div(&mut self);
+    fn muldiv(&mut self);
     fn eq(&mut self);
     fn disp(&mut self);
     fn emit(&mut self);
@@ -34,6 +35,17 @@ impl Primv for ForthCore<'_> {
         let x = self.pop();
         let y = self.pop();
         self.push(x * y);
+    }
+    fn div(&mut self) {
+        let x = self.pop();
+        let y = self.pop();
+        self.push(y / x);
+    }
+    fn muldiv(&mut self) {
+        let x = self.pop();
+        let y = self.pop();
+        let z = self.pop();
+        self.push(z * y / x  );
     }
     fn eq(&mut self) {
         let x = self.pop();
