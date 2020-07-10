@@ -6,6 +6,7 @@ use crate::stack::Stack;
 use crate::word::{ForthWord, WordType};
 use log::{info, trace, warn};
 use std::io::{stdout, Write};
+use std::io::prelude::*;
 
 // pub type Defines = Vec<usize>;
 // const LITERAL: usize = 9999;
@@ -214,7 +215,7 @@ impl<'a> ForthCore<'a> {
         }
     }
 
-    pub fn interpret2(&mut self, input: &str) {
+    pub fn interpret2(&mut self, input: &str) -> String {
         let text = input
             .split_whitespace()
             .map(|s| s.to_string())
@@ -226,7 +227,7 @@ impl<'a> ForthCore<'a> {
             match self.text.pop() {
                 Some(n) => self.parse_word(n.as_ref()),
                 None => {
-                    return;
+                    return " OK. ".to_string();
                     // trace!("in loop");
                 }
             }
@@ -382,7 +383,7 @@ pub trait Vocabulary {
 impl Vocabulary for ForthCore<'_> {
     fn define_const(&mut self) {
         //self.state = CoreState::CustomInit;
-        print!("define a const ");
+        trace!("define a const ");
         self.do_create();
         self.words.set_last_func(Self::do_const);
         self.words.set_last_type(WordType::Const);
@@ -392,14 +393,14 @@ impl Vocabulary for ForthCore<'_> {
 
     fn define_var(&mut self) {
         trace!("define var");
-        self.push(0);
-        self.define_const();
+        self.do_create();
         self.words.set_last_func(Self::do_var); // which push var addr to stack
         self.words.set_last_type(WordType::Var);
+        self.compile_lit(0);
     }
     fn define_word(&mut self) {
         self.state = CoreState::Custom;
-        print!("define a new word ");
+        trace!("define a new word ");
         self.do_create();
         //self.words.last_word().func = Self::do_colon;
     }
@@ -520,3 +521,15 @@ impl Vocabulary for ForthCore<'_> {
 }
 
 
+pub fn readline2() -> String {
+    let stdin = std::io::stdin();
+
+    let input = stdin.lock().lines().next();
+
+    input
+        .expect("No lines in buffer")
+        .expect("Failed to read line")
+        .trim()
+        .to_string()
+
+}

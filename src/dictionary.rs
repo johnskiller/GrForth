@@ -48,36 +48,56 @@ pub struct Dictionary<'a> {
 
 impl<'a> fmt::Debug for Dictionary<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let itemname = | i,item :&DefineItem| -> &str  {
+        let def_name = |i| -> String {
+            for v in self.index.values()
+            /*.filter(|v| {v.wtype == WordType::Dict}) */{
+                if v.define_ptr == i {
+                    return match v.wtype {
+                        WordType::Dict => format!(": {}",v.name),
+                        WordType::Const => format!("Const {}",v.name),
+                        WordType::Var => format!("Var {}",v.name),
+                        WordType::Primv => format!("??Primv {}",v.name),
+                    }
+                }
+            }
+            "NOT FOUND".to_string()
+        };
+        let func_name = |i:usize, f:&WFunc| -> Option<String> {
+            let f_colon : WFunc = Vocabulary::do_colon;
+            if *f as usize == f_colon as usize {
+
+                return Some(def_name(i));
+            }
+            
+            None
+        };
+        let itemname = | i,item :&DefineItem| -> String  {
             match item {
-                DefineItem::Lit(_) => "",
+                DefineItem::Lit(_) => "".to_string(),
                 DefineItem::Func(f) => {
-                    let colon : WFunc = Vocabulary::do_colon;
-                    if *f as usize == colon as usize {
-                        for v in self.index.values()
-                        .filter(|v| {v.wtype == WordType::Dict}) {
-                            if v.define_ptr == i {return &v.name}
+                    match func_name(i,f) {
+                        Some(s) => s,
+                        None => {
+                            for v in self.index.values() {
+                                if v.func as usize == *f as usize { return v.name.to_owned() }
+                            }
+                            "".to_string()
                         }
-                        return " : " 
                     }
-                    for v in self.index.values() {
-                        if v.func as usize == *f as usize { return &v.name }
-                    }
-                    ""
                 },
                 DefineItem::Addr(n) => {
                     for v in self.index.values() {
                         if v.define_ptr == *n {
-                            return &v.name
+                            return v.name.to_owned();
                         }
                     }
-                    ""
+                    "".to_string()
                 }
             }
         };
-        write!(f,"\n");
+        write!(f,"\n")?;
         for (i,item) in self.defines.iter().enumerate() {
-            write!(f, "{:>4} {:?} {}\n", i,item, itemname(i,item));
+            write!(f, "{:>4} {:?} {}\n", i,item, itemname(i,item))?;
         }
         write!(f, "last:{:?}", self.last_word)
     }
@@ -187,8 +207,8 @@ impl<'a> Dictionary<'a> {
             Some(w) => {
                 match w.wtype {
                 WordType::Primv => {
-                let func = DefineItem::Func(w.func);
-                self.defines.push(func);
+                    let df = DefineItem::Func(w.func);
+                    self.defines.push(df);
                 },
                 WordType::Dict => {
                     let def = DefineItem::Addr(w.define_ptr);

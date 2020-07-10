@@ -34,7 +34,9 @@ impl<'a> fmt::Debug for ForthWord<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let d_ptr = match self.wtype {
             WordType::Dict => format!("Dict  d_ptr:{}",self.define_ptr),
-            _ => "Primv".to_string(),
+            WordType::Var => format!("VAR  d_ptr:{}",self.define_ptr),
+            WordType::Const => format!("CONST  d_ptr:{}",self.define_ptr),
+            _ => format!("{:?}",self.wtype),
         };
         write!(
             f,
